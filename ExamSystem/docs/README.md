@@ -840,11 +840,10 @@ App: `http://localhost:5082`
 {
   "statusCode": 201,
   "error": null,
-  "message": "User registered successfully",
+  "message": "Đăng ký thành công",
   "data": {
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "dGhpc2lzYXJlZnJlc2h0b2tlbg==...",
-    "expiresAt": "2024-01-20T13:00:00Z",
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": 900,
     "user": {
       "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
       "username": "john_doe",
@@ -857,15 +856,25 @@ App: `http://localhost:5082`
 }
 ```
 
+**Set-Cookie Header:**
+```
+refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbg==...; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Expires=Sun, 27 Jan 2024 12:00:00 GMT
+```
+
+**⚠️ Lưu ý:**
+- Access token trả về trong response body
+- Refresh token gửi qua HttpOnly Cookie (JavaScript KHÔNG thể đọc)
+- Cookie tự động được browser gửi kèm mỗi request đến `/api/v1/auth/*`
+
 **Response 400 - Duplicate Username:**
 ```json
 {
   "statusCode": 400,
   "error": {
     "code": "BUSINESS_ERROR",
-    "reason": "Username 'john_doe' is already taken"
+    "reason": "Tên đăng nhập 'john_doe' đã được sử dụng"
   },
-  "message": "Username 'john_doe' is already taken",
+  "message": "Tên đăng nhập 'john_doe' đã được sử dụng",
   "data": null
 }
 ```
@@ -891,7 +900,7 @@ App: `http://localhost:5082`
       }
     ]
   },
-  "message": "Validation failed",
+  "message": "Dữ liệu không hợp lệ",
   "data": null
 }
 ```
@@ -918,11 +927,10 @@ App: `http://localhost:5082`
 {
   "statusCode": 200,
   "error": null,
-  "message": "Login successful",
+  "message": "Đăng nhập thành công",
   "data": {
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiI4ZmE4NWY2NC01NzE3LTQ1NjItYjNmYy0yYzk2M2Y2NmFmYWIiLCJ1bmlxdWVfbmFtZSI6ImpvaG5fZG9lIiwiZW1haWwiOiJqb2huQGV4YW1wbGUuY29tIiwiZnVsbE5hbWUiOiJKb2huIERvZSIsImlzQWN0aXZlIjoiVHJ1ZSIsIm5iZiI6MTcwNTc1MjAwMCwiZXhwIjoxNzA1NzU1NjAwLCJpYXQiOjE3MDU3NTIwMDAsImlzcyI6IkV4YW1TeXN0ZW1BUEkiLCJhdWQiOiJFeGFtU3lzdGVtQ2xpZW50In0...",
-    "refreshToken": "dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA=",
-    "expiresAt": "2024-01-20T13:00:00Z",
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": 900,
     "user": {
       "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
       "username": "john_doe",
@@ -935,15 +943,20 @@ App: `http://localhost:5082`
 }
 ```
 
+**Set-Cookie Header:**
+```
+refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Expires=Sun, 27 Jan 2024 12:00:00 GMT
+```
+
 **Response 401 - Invalid Credentials:**
 ```json
 {
   "statusCode": 401,
   "error": {
     "code": "UNAUTHORIZED",
-    "reason": "Invalid username/email or password"
+    "reason": "Tên đăng nhập hoặc mật khẩu không đúng"
   },
-  "message": "Invalid username/email or password",
+  "message": "Tên đăng nhập hoặc mật khẩu không đúng",
   "data": null
 }
 ```
@@ -954,9 +967,9 @@ App: `http://localhost:5082`
   "statusCode": 401,
   "error": {
     "code": "UNAUTHORIZED",
-    "reason": "User account is inactive"
+    "reason": "Tài khoản đã bị khóa"
   },
-  "message": "User account is inactive",
+  "message": "Tài khoản đã bị khóa",
   "data": null
 }
 ```
@@ -969,10 +982,13 @@ App: `http://localhost:5082`
 **Endpoint:** `/api/v1/auth/refresh`
 
 **Request Body:**
-```json
-{
-  "refreshToken": "dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA="
-}
+```
+KHÔNG CÓ BODY
+```
+
+**Cookie (tự động gửi bởi browser):**
+```
+refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA=
 ```
 
 **Response 200:**
@@ -980,11 +996,10 @@ App: `http://localhost:5082`
 {
   "statusCode": 200,
   "error": null,
-  "message": "Token refreshed successfully",
+  "message": "Làm mới token thành công",
   "data": {
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "bmV3cmVmcmVzaHRva2VuMTIzNDU2Nzg5MA==",
-    "expiresAt": "2024-01-20T14:00:00Z",
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": 900,
     "user": {
       "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
       "username": "john_doe",
@@ -997,9 +1012,28 @@ App: `http://localhost:5082`
 }
 ```
 
+**Set-Cookie Header (NEW refresh token):**
+```
+refresh_token=bmV3cmVmcmVzaHRva2VuMTIzNDU2Nzg5MA==; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Expires=Sun, 27 Jan 2024 14:00:00 GMT
+```
+
 **⚠️ Lưu ý:** 
-- Refresh token cũ sẽ bị revoke
-- Trả về access token MỚI + refresh token MỚI
+- Refresh token cũ tự động bị revoke
+- Trả về access token MỚI + refresh token MỚI (qua cookie)
+- Client KHÔNG cần gửi refresh token trong body, cookie tự động gửi
+
+**Response 401 - Missing Cookie:**
+```json
+{
+  "statusCode": 401,
+  "error": {
+    "code": "UNAUTHORIZED",
+    "reason": "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại"
+  },
+  "message": "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại",
+  "data": null
+}
+```
 
 **Response 401 - Invalid Token:**
 ```json
@@ -1007,9 +1041,9 @@ App: `http://localhost:5082`
   "statusCode": 401,
   "error": {
     "code": "UNAUTHORIZED",
-    "reason": "Invalid refresh token"
+    "reason": "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại"
   },
-  "message": "Invalid refresh token",
+  "message": "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại",
   "data": null
 }
 ```
@@ -1020,9 +1054,9 @@ App: `http://localhost:5082`
   "statusCode": 401,
   "error": {
     "code": "UNAUTHORIZED",
-    "reason": "Refresh token has been revoked"
+    "reason": "Phiên đăng nhập đã bị thu hồi"
   },
-  "message": "Refresh token has been revoked",
+  "message": "Phiên đăng nhập đã bị thu hồi",
   "data": null
 }
 ```
@@ -1033,9 +1067,22 @@ App: `http://localhost:5082`
   "statusCode": 401,
   "error": {
     "code": "UNAUTHORIZED",
-    "reason": "Refresh token has expired"
+    "reason": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại"
   },
-  "message": "Refresh token has expired",
+  "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại",
+  "data": null
+}
+```
+
+**Response 401 - Inactive User:**
+```json
+{
+  "statusCode": 401,
+  "error": {
+    "code": "UNAUTHORIZED",
+    "reason": "Tài khoản đã bị khóa"
+  },
+  "message": "Tài khoản đã bị khóa",
   "data": null
 }
 ```
@@ -1048,10 +1095,13 @@ App: `http://localhost:5082`
 **Endpoint:** `/api/v1/auth/logout`
 
 **Request Body:**
-```json
-{
-  "refreshToken": "dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA="
-}
+```
+KHÔNG CÓ BODY
+```
+
+**Cookie (tự động gửi bởi browser):**
+```
+refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA=
 ```
 
 **Response 200:**
@@ -1059,20 +1109,141 @@ App: `http://localhost:5082`
 {
   "statusCode": 200,
   "error": null,
-  "message": "Logout successful",
+  "message": "Đăng xuất thành công",
   "data": null
 }
 ```
 
-**Response 404 - Token Not Found:**
+**Set-Cookie Header (xóa cookie):**
+```
+refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Expires=Thu, 01 Jan 1970 00:00:00 GMT
+```
+
+**⚠️ Lưu ý:**
+- Refresh token bị revoke trong database
+- Cookie tự động bị xóa
+- Client KHÔNG cần gửi refresh token trong body
+
+---
+
+## 🔐 Protected Endpoints (Yêu cầu xác thực)
+
+**TẤT CẢ endpoints sau đây yêu cầu Access Token:**
+
+### Cách sử dụng Access Token
+
+**Header:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Ví dụ:**
+```http
+GET /api/v1/users
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+---
+
+### Danh sách Endpoints được bảo vệ
+
+#### ✅ Roles (7 endpoints)
+- `GET /api/v1/roles` - Lấy danh sách roles
+- `GET /api/v1/roles/{id}` - Lấy role theo ID
+- `GET /api/v1/roles/{id}/permissions` - Lấy role kèm permissions
+- `POST /api/v1/roles` - Tạo role mới
+- `PUT /api/v1/roles/{id}` - Cập nhật role
+- `DELETE /api/v1/roles/{id}` - Xóa role
+- `POST /api/v1/roles/{id}/permissions` - Gán permissions
+
+#### ✅ Permissions (5 endpoints)
+- `GET /api/v1/permissions` - Lấy danh sách permissions
+- `GET /api/v1/permissions/{id}` - Lấy permission theo ID
+- `POST /api/v1/permissions` - Tạo permission mới
+- `PUT /api/v1/permissions/{id}` - Cập nhật permission
+- `DELETE /api/v1/permissions/{id}` - Xóa permission
+
+#### ✅ Users (8 endpoints)
+- `GET /api/v1/users` - Lấy danh sách users
+- `GET /api/v1/users/{id}` - Lấy user theo ID
+- `GET /api/v1/users/{id}/roles` - Lấy user kèm roles
+- `POST /api/v1/users` - Tạo user mới
+- `PUT /api/v1/users/{id}` - Cập nhật user
+- `DELETE /api/v1/users/{id}` - Xóa user
+- `POST /api/v1/users/{id}/roles` - Gán roles
+- `POST /api/v1/users/{id}/change-password` - Đổi password
+
+---
+
+### Xử lý lỗi xác thực
+
+**401 - Chưa đăng nhập:**
+```http
+GET /api/v1/users
+(KHÔNG có Authorization header)
+```
+
+**Response:**
 ```json
 {
-  "statusCode": 404,
+  "statusCode": 401,
   "error": {
-    "code": "NOT_FOUND",
-    "resource": "Refresh token not found"
+    "code": "UNAUTHORIZED",
+    "reason": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
   },
-  "message": "Refresh token not found",
+  "message": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn",
+  "data": null
+}
+```
+
+---
+
+**401 - Token hết hạn:**
+```http
+GET /api/v1/users
+Authorization: Bearer {expired_access_token}
+```
+
+**Response:**
+```json
+{
+  "statusCode": 401,
+  "error": {
+    "code": "UNAUTHORIZED",
+    "reason": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
+  },
+  "message": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn",
+  "data": null
+}
+```
+
+**Response Header:**
+```
+Token-Expired: true
+```
+
+**⚠️ Lưu ý:** Khi nhận `Token-Expired: true`, client nên:
+1. Gọi `POST /api/v1/auth/refresh` để lấy access token mới
+2. Retry request với access token mới
+3. Nếu refresh failed → redirect to login
+
+---
+
+**401 - Token không hợp lệ:**
+```http
+GET /api/v1/users
+Authorization: Bearer invalid_token
+```
+
+**Response:**
+```json
+{
+  "statusCode": 401,
+  "error": {
+    "code": "UNAUTHORIZED",
+    "reason": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
+  },
+  "message": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn",
   "data": null
 }
 ```
@@ -1098,11 +1269,18 @@ App: `http://localhost:5082`
 ```
 
 ### Token Configuration
-- **Access Token Lifetime:** 60 minutes
+- **Access Token Lifetime:** 15 minutes (900 seconds)
 - **Refresh Token Lifetime:** 7 days
 - **Algorithm:** HMAC-SHA256
 - **Issuer:** ExamSystemAPI
 - **Audience:** ExamSystemClient
+
+### Cookie Configuration
+- **HttpOnly:** true (JavaScript không thể truy cập)
+- **Secure:** true (chỉ gửi qua HTTPS)
+- **SameSite:** Strict (ngăn CSRF)
+- **Path:** /api/v1/auth (chỉ gửi đến auth endpoints)
+- **Expires:** 7 days
 
 ---
 
@@ -1133,11 +1311,13 @@ App: `http://localhost:5082`
 
 ## 🧪 Testing Scenarios
 
-### Scenario 1: Register → Login Flow
+### Scenario 1: Register → Use Access Token
 
 **Step 1: Register**
 ```http
 POST /api/v1/auth/register
+Content-Type: application/json
+
 {
   "username": "test_user",
   "email": "test@example.com",
@@ -1146,99 +1326,143 @@ POST /api/v1/auth/register
 }
 ```
 
-**Expected:** 201, accessToken + refreshToken
+**Expected:** 
+- Status 201
+- Response body có `access_token` + `expires_in` + `user`
+- Set-Cookie header có `refresh_token`
 
 ---
 
 **Step 2: Use Access Token**
 ```http
 GET /api/v1/users
-Authorization: Bearer {accessToken}
+Authorization: Bearer {access_token from step 1}
 ```
 
-**Expected:** 200, danh sách users
+**Expected:** 
+- Status 200
+- Danh sách users
 
 ---
 
-### Scenario 2: Login → Refresh → Logout
+### Scenario 2: Login → Access Protected → Refresh → Logout
 
 **Step 1: Login**
 ```http
 POST /api/v1/auth/login
+Content-Type: application/json
+
 {
   "usernameOrEmail": "test_user",
   "password": "Test123456"
 }
 ```
 
-**Expected:** 200, accessToken + refreshToken
+**Expected:**
+- Status 200
+- Response body có `access_token`
+- Cookie `refresh_token` được set
 
 ---
 
-**Step 2: Wait for access token to expire (hoặc test refresh)**
+**Step 2: Access protected endpoint**
 ```http
-POST /api/v1/auth/refresh
-{
-  "refreshToken": "{refreshToken from login}"
-}
+GET /api/v1/roles
+Authorization: Bearer {access_token}
 ```
 
-**Expected:** 200, NEW accessToken + NEW refreshToken
+**Expected:**
+- Status 200
+- Danh sách roles
 
 ---
 
-**Step 3: Logout**
+**Step 3: Wait 15 minutes (hoặc test với token hết hạn)**
+```http
+GET /api/v1/roles
+Authorization: Bearer {expired_access_token}
+```
+
+**Expected:**
+- Status 401
+- Header `Token-Expired: true`
+- Message: "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
+
+---
+
+**Step 4: Refresh token**
+```http
+POST /api/v1/auth/refresh
+(Cookie tự động gửi refresh_token)
+```
+
+**Expected:**
+- Status 200
+- Response body có `access_token` MỚI
+- Cookie `refresh_token` MỚI được set
+- Refresh token cũ bị revoke
+
+---
+
+**Step 5: Use new access token**
+```http
+GET /api/v1/roles
+Authorization: Bearer {new_access_token}
+```
+
+**Expected:**
+- Status 200
+- Danh sách roles
+
+---
+
+**Step 6: Logout**
 ```http
 POST /api/v1/auth/logout
-{
-  "refreshToken": "{latest refreshToken}"
-}
+(Cookie tự động gửi refresh_token)
 ```
 
-**Expected:** 200, token revoked
+**Expected:**
+- Status 200
+- Cookie `refresh_token` bị xóa
+- Refresh token bị revoke trong database
 
 ---
 
-**Step 4: Try to refresh with revoked token**
+**Step 7: Try to refresh with revoked token**
 ```http
 POST /api/v1/auth/refresh
-{
-  "refreshToken": "{revoked refreshToken}"
-}
+(Cookie chứa revoked refresh_token)
 ```
 
-**Expected:** 401, "Refresh token has been revoked"
+**Expected:**
+- Status 401
+- Message: "Phiên đăng nhập đã bị thu hồi"
 
 ---
 
-### Scenario 3: Protected Endpoints
+### Scenario 3: Access without token
 
 **Without Token:**
 ```http
 GET /api/v1/users
 ```
 
-**Expected:** 401 Unauthorized
+**Expected:** 
+- Status 401
+- Message: "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
 
 ---
 
-**With Valid Token:**
+**With Invalid Token:**
 ```http
 GET /api/v1/users
-Authorization: Bearer {accessToken}
+Authorization: Bearer invalid_token_here
 ```
 
-**Expected:** 200, data
-
----
-
-**With Expired Token:**
-```http
-GET /api/v1/users
-Authorization: Bearer {expiredAccessToken}
-```
-
-**Expected:** 401, "Token has expired"
+**Expected:**
+- Status 401
+- Message: "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
 
 ---
 

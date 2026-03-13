@@ -42,11 +42,11 @@ public class AuthService : IAuthService
     {
         // Check if username already exists
         if (await _userRepository.ExistsByUsernameAsync(dto.Username))
-            throw new InvalidOperationException($"Username '{dto.Username}' is already taken");
+            throw new InvalidOperationException($"Tên đăng nhập '{dto.Username}' đã được sử dụng");
 
         // Check if email already exists
         if (await _userRepository.ExistsByEmailAsync(dto.Email))
-            throw new InvalidOperationException($"Email '{dto.Email}' is already registered");
+            throw new InvalidOperationException($"Email '{dto.Email}' đã được đăng ký");
 
         // Create user
         var user = new User
@@ -94,24 +94,21 @@ public class AuthService : IAuthService
                    ?? await _userRepository.GetByEmailAsync(dto.UsernameOrEmail);
 
         if (user == null)
-            throw new UnauthorizedAccessException("Invalid username/email or password");
+            throw new UnauthorizedAccessException("Tên đăng nhập hoặc mật khẩu không đúng");
 
         // Check if user is active
         if (!user.IsActive)
-            throw new UnauthorizedAccessException("User account is inactive");
+            throw new UnauthorizedAccessException("Tài khoản đã bị khóa");
 
         // Verify password
         var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password);
         if (result == PasswordVerificationResult.Failed)
-            throw new UnauthorizedAccessException("Invalid username/email or password");
+            throw new UnauthorizedAccessException("Tên đăng nhập hoặc mật khẩu không đúng");
 
         // Generate tokens
         var accessToken = GenerateAccessToken(user);
         var refreshToken = GenerateRefreshToken();
         var expiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
-
-        // Revoke old refresh tokens (optional - single device login)
-        // await _refreshTokenRepository.RevokeAllUserTokensAsync(user.Id);
 
         // Save refresh token
         await _refreshTokenRepository.CreateAsync(new RefreshToken
@@ -131,23 +128,29 @@ public class AuthService : IAuthService
         );
     }
 
-    public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenRequestDto dto)
+    public async Task<AuthResponseDto> RefreshTokenAsync(string refreshToken)
     {
-        var storedToken = await _refreshTokenRepository.GetByTokenAsync(dto.RefreshToken);
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            throw new UnauthorizedAccessException("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại");
+
+        var storedToken = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
 
         if (storedToken == null)
-            throw new UnauthorizedAccessException("Invalid refresh token");
+            throw new UnauthorizedAccessException("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại");
 
         if (storedToken.IsRevoked)
-            throw new UnauthorizedAccessException("Refresh token has been revoked");
+            throw new UnauthorizedAccessException("Phiên đăng nhập đã bị thu hồi");
 
         if (storedToken.ExpiresAt < DateTime.UtcNow)
-            throw new UnauthorizedAccessException("Refresh token has expired");
+            throw new UnauthorizedAccessException("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại");
 
         var user = storedToken.User;
 
+        if (user == null)
+            throw new UnauthorizedAccessException("Tài khoản không tồn tại");
+
         if (!user.IsActive)
-            throw new UnauthorizedAccessException("User account is inactive");
+            throw new UnauthorizedAccessException("Tài khoản đã bị khóa");
 
         // Generate new tokens
         var accessToken = GenerateAccessToken(user);
@@ -176,14 +179,14 @@ public class AuthService : IAuthService
         );
     }
 
-    public async Task LogoutAsync(LogoutDto dto)
+    public async Task LogoutAsync(string refreshToken)
     {
-        var storedToken = await _refreshTokenRepository.GetByTokenAsync(dto.RefreshToken);
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return; // Không có token thì không cần làm gì
 
-        if (storedToken == null)
-            throw new KeyNotFoundException("Refresh token not found");
+        var storedToken = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
 
-        if (!storedToken.IsRevoked)
+        if (storedToken != null && !storedToken.IsRevoked)
         {
             storedToken.IsRevoked = true;
             await _refreshTokenRepository.UpdateAsync(storedToken);

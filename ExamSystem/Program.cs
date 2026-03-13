@@ -63,6 +63,57 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key),
         ClockSkew = TimeSpan.Zero
     };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            if (context.Exception.GetType() == typeof(SecurityTokenExpiredException))
+            {
+                context.Response.Headers.Append("Token-Expired", "true");
+            }
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            context.HandleResponse();
+            context.Response.StatusCode = 401;
+            context.Response.ContentType = "application/json";
+
+            var result = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                statusCode = 401,
+                error = new
+                {
+                    code = "UNAUTHORIZED",
+                    reason = "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
+                },
+                message = "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn",
+                data = (object?)null
+            });
+
+            return context.Response.WriteAsync(result);
+        },
+        OnForbidden = context =>
+        {
+            context.Response.StatusCode = 403;
+            context.Response.ContentType = "application/json";
+
+            var result = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                statusCode = 403,
+                error = new
+                {
+                    code = "FORBIDDEN",
+                    reason = "Bạn không có quyền truy cập tài nguyên này"
+                },
+                message = "Bạn không có quyền truy cập tài nguyên này",
+                data = (object?)null
+            });
+
+            return context.Response.WriteAsync(result);
+        }
+    };
 });
 
 builder.Services.AddAuthorization();
@@ -83,6 +134,18 @@ builder.Services.AddApiVersioning(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+
+// Cấu hình CORS để cho phép frontend truy cập API
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("https://yourdomain.com")
+              .AllowCredentials() // QUAN TRỌNG cho Cookie
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
