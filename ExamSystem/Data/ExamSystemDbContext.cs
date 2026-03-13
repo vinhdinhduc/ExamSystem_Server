@@ -1,3 +1,4 @@
+using ExamSystem.Data.Configurations;
 using ExamSystem.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,48 +30,11 @@ public class ExamSystemDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Username).IsUnique();
-            entity.HasIndex(e => e.Email).IsUnique();
-        });
-
-        modelBuilder.Entity<Role>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-        });
-
-        modelBuilder.Entity<Permission>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-        });
-
-        modelBuilder.Entity<UserRole>(entity =>
-        {
-            entity.HasKey(e => new { e.UserId, e.RoleId });
-            entity.HasOne(e => e.User)
-                .WithMany(e => e.UserRoles)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(e => e.Role)
-                .WithMany(e => e.UserRoles)
-                .HasForeignKey(e => e.RoleId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<RolePermission>(entity =>
-        {
-            entity.HasKey(e => new { e.RoleId, e.PermissionId });
-            entity.HasOne(e => e.Role)
-                .WithMany(e => e.RolePermissions)
-                .HasForeignKey(e => e.RoleId)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(e => e.Permission)
-                .WithMany(e => e.RolePermissions)
-                .HasForeignKey(e => e.PermissionId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
+        modelBuilder.ApplyConfiguration(new RoleConfiguration());
+        modelBuilder.ApplyConfiguration(new PermissionConfiguration());
+        modelBuilder.ApplyConfiguration(new RolePermissionConfiguration());
+        modelBuilder.ApplyConfiguration(new UserConfiguration());
+        modelBuilder.ApplyConfiguration(new UserRoleConfiguration());
 
         modelBuilder.Entity<RefreshToken>(entity =>
         {
@@ -128,7 +92,8 @@ public class ExamSystemDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.Question)
                 .WithMany(e => e.ExamQuestions)
-                .HasForeignKey(e => e.QuestionId);
+                .HasForeignKey(e => e.QuestionId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<Group>(entity =>
@@ -137,7 +102,8 @@ public class ExamSystemDbContext : DbContext
             entity.HasIndex(e => e.Code).IsUnique();
             entity.HasOne(e => e.CreatedByUser)
                 .WithMany(e => e.GroupsCreated)
-                .HasForeignKey(e => e.CreatedByUserId);
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<GroupMember>(entity =>
@@ -162,10 +128,12 @@ public class ExamSystemDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.User)
                 .WithMany(e => e.ExamAssignments)
-                .HasForeignKey(e => e.UserId);
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(e => e.Group)
                 .WithMany(e => e.ExamAssignments)
-                .HasForeignKey(e => e.GroupId);
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<ExamSession>(entity =>
@@ -174,10 +142,12 @@ public class ExamSystemDbContext : DbContext
             entity.Property(e => e.Score).HasPrecision(5, 2);
             entity.HasOne(e => e.Exam)
                 .WithMany(e => e.ExamSessions)
-                .HasForeignKey(e => e.ExamId);
+                .HasForeignKey(e => e.ExamId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.User)
                 .WithMany(e => e.ExamSessions)
-                .HasForeignKey(e => e.UserId);
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<SessionAnswer>(entity =>
@@ -190,7 +160,8 @@ public class ExamSystemDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.Question)
                 .WithMany(e => e.SessionAnswers)
-                .HasForeignKey(e => e.QuestionId);
+                .HasForeignKey(e => e.QuestionId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<SessionAnswerDetail>(entity =>
@@ -202,7 +173,8 @@ public class ExamSystemDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.Answer)
                 .WithMany(e => e.SessionAnswerDetails)
-                .HasForeignKey(e => e.AnswerId);
+                .HasForeignKey(e => e.AnswerId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }

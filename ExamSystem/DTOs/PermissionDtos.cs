@@ -1,17 +1,16 @@
+using System;
+
 namespace ExamSystem.DTOs;
 
 public record PermissionDto(
-    int Id,
-    string Name,
-    string? Description,
-    string Module);
+    Guid Id,
+    string Code,
+    string? Description);
 
 public record PermissionCreateDto(
-    string Name,
-    string? Description,
-    string Module);
+    string Code,
+    string? Description);
 
 public record PermissionUpdateDto(
-    string Name,
-    string? Description,
-    string Module);
+    string Code,
+    string? Description);

@@ -1,6 +1,93 @@
-@ExamSystem_HostAddress = http://localhost:5082
+### Online Exam System - Role & Permission API Tests
+@baseUrl = http://localhost:5000/api/v1
 
-GET {{ExamSystem_HostAddress}}/weatherforecast/
-Accept: application/json
+###############################################
+### ROLE MANAGEMENT APIs
+###############################################
 
-###
+### 1. GET All Roles (No Pagination)
+GET {{baseUrl}}/roles
+Content-Type: application/json
+
+### 2. GET All Roles (With Pagination)
+GET {{baseUrl}}/roles?page=1&pageSize=10
+Content-Type: application/json
+
+### 3. GET Role by ID (Replace {roleId} with actual Guid)
+GET {{baseUrl}}/roles/{roleId}
+Content-Type: application/json
+
+### 4. GET Role with Permissions
+GET {{baseUrl}}/roles/{roleId}/permissions
+Content-Type: application/json
+
+### 5. CREATE New Role
+POST {{baseUrl}}/roles
+Content-Type: application/json
+
+{
+  "name": "Manager",
+  "description": "Manager role with limited permissions"
+}
+
+### 6. UPDATE Role
+PUT {{baseUrl}}/roles/{roleId}
+Content-Type: application/json
+
+{
+  "name": "Senior Manager",
+  "description": "Updated description"
+}
+
+### 7. DELETE Role
+DELETE {{baseUrl}}/roles/{roleId}
+Content-Type: application/json
+
+### 8. ASSIGN Permissions to Role
+POST {{baseUrl}}/roles/{roleId}/permissions
+Content-Type: application/json
+
+{
+  "permissionIds": [
+    "permission-id-1",
+    "permission-id-2"
+  ]
+}
+
+###############################################
+### PERMISSION MANAGEMENT APIs
+###############################################
+
+### 9. GET All Permissions
+GET {{baseUrl}}/permissions
+Content-Type: application/json
+
+### 10. GET All Permissions (With Pagination)
+GET {{baseUrl}}/permissions?page=1&pageSize=20
+Content-Type: application/json
+
+### 11. GET Permission by ID
+GET {{baseUrl}}/permissions/{permissionId}
+Content-Type: application/json
+
+### 12. CREATE New Permission
+POST {{baseUrl}}/permissions
+Content-Type: application/json
+
+{
+  "code": "REPORT_VIEW",
+  "description": "Xem báo cáo"
+}
+
+### 13. UPDATE Permission
+PUT {{baseUrl}}/permissions/{permissionId}
+Content-Type: application/json
+
+{
+  "code": "REPORT_MANAGE",
+  "description": "Quản lý báo cáo"
+}
+
+### 14. DELETE Permission
+DELETE {{baseUrl}}/permissions/{permissionId}
+Content-Type: application/json
