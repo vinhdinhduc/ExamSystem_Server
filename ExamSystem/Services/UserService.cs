@@ -7,6 +7,7 @@ using ExamSystem.DTOs;
 using ExamSystem.Models;
 using ExamSystem.Repositories.Interfaces;
 using ExamSystem.Services.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 
 namespace ExamSystem.Services;
@@ -17,17 +18,20 @@ public class UserService : IUserService
     private readonly IRoleRepository _roleRepository;
     private readonly IMapper _mapper;
     private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly IFileService _fileService;
 
     public UserService(
         IUserRepository userRepository,
         IRoleRepository roleRepository,
         IMapper mapper,
-        IPasswordHasher<User> passwordHasher)
+        IPasswordHasher<User> passwordHasher,
+        IFileService fileService)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
         _mapper = mapper;
         _passwordHasher = passwordHasher;
+        _fileService = fileService;
     }
 
     public async Task<UserDto?> GetByIdAsync(Guid id)
@@ -51,6 +55,7 @@ public class UserService : IUserService
             user.Username,
             user.Email,
             user.FullName,
+            user.Avatar,
             user.IsActive,
             user.CreatedAt,
             roles
@@ -86,6 +91,7 @@ public class UserService : IUserService
             u.Username,
             u.Email,
             u.FullName,
+            u.Avatar,
             u.IsActive,
             u.CreatedAt,
             u.UserRoles.Where(ur => ur.Role != null).Select(ur => ur.Role!.Name).ToList()
@@ -208,5 +214,22 @@ public class UserService : IUserService
         // Hash and set new password
         user.PasswordHash = _passwordHasher.HashPassword(user, dto.NewPassword);
         await _userRepository.UpdateAsync(user);
+    }
+
+    public async Task<UserDto> UploadAvatarAsync(Guid id, IFormFile file)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null)
+            throw new KeyNotFoundException($"User with id '{id}' not found");
+
+        // Xóa avatar cũ nếu có
+        _fileService.DeleteAvatar(user.Avatar);
+
+        // Lưu file mới
+        var fileName = await _fileService.SaveAvatarAsync(file);
+        user.Avatar = fileName;
+
+        var updated = await _userRepository.UpdateAsync(user);
+        return _mapper.Map<UserDto>(updated);
     }
 }

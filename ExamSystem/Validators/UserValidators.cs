@@ -9,8 +9,7 @@ public class UserCreateDtoValidator : AbstractValidator<UserCreateDto>
     {
         RuleFor(x => x.Username)
             .NotEmpty().WithMessage("Username is required")
-            .MaximumLength(50).WithMessage("Username cannot exceed 50 characters")
-            .Matches("^[a-zA-Z0-9_]+$").WithMessage("Username can only contain letters, numbers, and underscores");
+            .MaximumLength(50).WithMessage("Username cannot exceed 50 characters");
 
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email is required")
@@ -35,8 +34,7 @@ public class UserUpdateDtoValidator : AbstractValidator<UserUpdateDto>
         When(x => x.Username != null, () =>
         {
             RuleFor(x => x.Username)
-                .MaximumLength(50).WithMessage("Username cannot exceed 50 characters")
-                .Matches("^[a-zA-Z0-9_]+$").WithMessage("Username can only contain letters, numbers, and underscores");
+                .MaximumLength(50).WithMessage("Username cannot exceed 50 characters");
         });
 
         When(x => x.Email != null, () =>

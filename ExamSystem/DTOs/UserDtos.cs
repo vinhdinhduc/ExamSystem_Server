@@ -9,6 +9,7 @@ public record UserDto(
     string Username,
     string Email,
     string FullName,
+    string? Avatar,
     bool IsActive,
     DateTime CreatedAt
 );
@@ -19,6 +20,7 @@ public record UserListItemDto(
     string Username,
     string Email,
     string FullName,
+    string? Avatar,
     bool IsActive,
     DateTime CreatedAt,
     List<string> Roles
@@ -52,6 +54,7 @@ public record UserWithRolesDto(
     string Username,
     string Email,
     string FullName,
+    string? Avatar,
     bool IsActive,
     DateTime CreatedAt,
     List<RoleDto> Roles

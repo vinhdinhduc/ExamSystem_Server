@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ExamSystem.DTOs;
+using Microsoft.AspNetCore.Http;
 
 namespace ExamSystem.Services.Interfaces;
 
@@ -17,4 +18,5 @@ public interface IUserService
     Task AssignRolesAsync(Guid id, AssignRolesToUserDto dto);
     Task ChangePasswordAsync(Guid id, UserChangePasswordDto dto);
     Task<UserDto> ToggleLockAsync(Guid id);
+    Task<UserDto> UploadAvatarAsync(Guid id, IFormFile file);
 }

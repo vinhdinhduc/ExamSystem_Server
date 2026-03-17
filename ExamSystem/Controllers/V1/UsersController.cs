@@ -1,4 +1,5 @@
 using System;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Asp.Versioning;
 using ExamSystem.Authorization;
@@ -36,6 +37,89 @@ public class UsersController : ControllerBase
         _changePasswordValidator = changePasswordValidator;
         _assignRolesValidator = assignRolesValidator;
     }
+
+    // ── Self-service endpoints (không cần permission — user tự quản lý profile) ──
+
+    [HttpGet("me")]
+    public async Task<IActionResult> GetMe()
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var user = await _userService.GetByIdAsync(userId.Value);
+        if (user == null) return NotFound();
+
+        return Ok(ApiResponse<UserDto>.Success(user, "Lấy thông tin cá nhân thành công"));
+    }
+
+    [HttpPut("me")]
+    public async Task<IActionResult> UpdateMe([FromBody] UserUpdateDto dto)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var validationResult = await _updateValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(ApiResponse<object>.Failure(
+                new ValidationError { Details = validationResult.Errors.Select(e => new ValidationDetail { Field = e.PropertyName, Message = e.ErrorMessage }).ToList() },
+                "Dữ liệu không hợp lệ",
+                400
+            ));
+        }
+
+        var user = await _userService.UpdateAsync(userId.Value, dto);
+        return Ok(ApiResponse<UserDto>.Success(user, "Cập nhật thông tin thành công"));
+    }
+
+    [HttpPost("me/avatar")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadMyAvatar(IFormFile file)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.Failure(null, "Vui lòng chọn file ảnh", 400));
+
+        try
+        {
+            var user = await _userService.UploadAvatarAsync(userId.Value, file);
+            return Ok(ApiResponse<object>.Success(new { avatar = user.Avatar }, "Upload avatar thành công"));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<object>.Failure(null, ex.Message, 400));
+        }
+    }
+
+    [HttpPost("me/change-password")]
+    public async Task<IActionResult> ChangeMyPassword([FromBody] UserChangePasswordDto dto)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var validationResult = await _changePasswordValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(ApiResponse<object>.Failure(
+                new ValidationError { Details = validationResult.Errors.Select(e => new ValidationDetail { Field = e.PropertyName, Message = e.ErrorMessage }).ToList() },
+                "Dữ liệu không hợp lệ",
+                400
+            ));
+        }
+
+        await _userService.ChangePasswordAsync(userId.Value, dto);
+        return Ok(ApiResponse<object?>.Success(null, "Đổi mật khẩu thành công"));
+    }
+
+    private Guid? GetCurrentUserId()
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(claim, out var id) ? id : null;
+    }
+
+    // ── Admin endpoints (cần permission) ───────────────────────────────────────
 
     [HttpGet]
     [RequirePermission(Permissions.UserView)]
