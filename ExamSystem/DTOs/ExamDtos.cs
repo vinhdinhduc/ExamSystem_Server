@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ExamSystem.DTOs;
 
@@ -22,7 +23,8 @@ public record ExamDto(
     DateTime? EndDate,
     string? AccessCode,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    List<ExamQuestionDto>? Questions = null);
 
 public record ExamCreateDto(
     int SubjectId,
@@ -59,3 +61,13 @@ public record ExamUpdateDto(
     DateTime? StartDate,
     DateTime? EndDate,
     string? AccessCode);
+
+public record ExamFilterDto(
+    int? SubjectId,
+    byte? Status,
+    string? Keyword,
+    int? Page,
+    int? PageSize);
+
+public record PublishExamDto(
+    Guid PublishedByUserId);

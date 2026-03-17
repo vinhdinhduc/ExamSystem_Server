@@ -10,6 +10,15 @@ public record ExamAssignmentDto(
     DateTime AssignedAt);
 
 public record ExamAssignmentCreateDto(
-    Guid ExamId,
     Guid? UserId,
     int? GroupId);
+
+public record StudentAssignedExamDto(
+    Guid ExamId,
+    string Title,
+    int Duration,
+    decimal PassScore,
+    DateTime? StartDate,
+    DateTime? EndDate,
+    byte Status,
+    DateTime AssignedAt);

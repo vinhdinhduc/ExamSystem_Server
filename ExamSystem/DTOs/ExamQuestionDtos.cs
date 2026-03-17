@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ExamSystem.DTOs;
 
@@ -10,7 +11,6 @@ public record ExamQuestionDto(
     decimal Score);
 
 public record ExamQuestionCreateDto(
-    Guid ExamId,
     Guid QuestionId,
     int OrderIndex,
     decimal Score);
@@ -18,3 +18,10 @@ public record ExamQuestionCreateDto(
 public record ExamQuestionUpdateDto(
     int OrderIndex,
     decimal Score);
+
+public record ReorderExamQuestionsDto(
+    List<ExamQuestionOrderItemDto> Items);
+
+public record ExamQuestionOrderItemDto(
+    int ExamQuestionId,
+    int OrderIndex);
