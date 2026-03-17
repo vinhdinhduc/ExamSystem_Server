@@ -74,8 +74,9 @@ public class AssignRolesToUserDtoValidator : AbstractValidator<AssignRolesToUser
     public AssignRolesToUserDtoValidator()
     {
         RuleFor(x => x.RoleIds)
-            .NotEmpty().WithMessage("At least one role must be assigned")
+            .NotNull().WithMessage("RoleIds is required")
             .Must(list => list.All(id => id != Guid.Empty))
-            .WithMessage("All role IDs must be valid GUIDs");
+            .WithMessage("All role IDs must be valid GUIDs")
+            .When(x => x.RoleIds != null && x.RoleIds.Count > 0);
     }
 }

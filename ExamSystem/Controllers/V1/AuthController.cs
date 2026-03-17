@@ -47,21 +47,14 @@ public class AuthController : ControllerBase
 
         var response = await _authService.RegisterAsync(dto);
 
-        // Set refresh token cookie
-        SetRefreshTokenCookie(response.RefreshToken);
-
-        // Return only access token in response
-        var result = new
-        {
-            access_token = response.AccessToken,
-            expires_in = 900, // 15 minutes in seconds
-            user = response.User
-        };
-
         return CreatedAtAction(
             nameof(Register),
             null,
-            ApiResponse<object>.Success(result, "Đăng ký thành công", 201)
+            ApiResponse<object>.Success(
+                new { email = response.User.Email },
+                "Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.",
+                201
+            )
         );
     }
 
@@ -79,7 +72,19 @@ public class AuthController : ControllerBase
             ));
         }
 
-        var response = await _authService.LoginAsync(dto);
+        AuthResponseDto response;
+        try
+        {
+            response = await _authService.LoginAsync(dto);
+        }
+        catch (UnauthorizedAccessException ex) when (ex.Message == "EMAIL_NOT_VERIFIED")
+        {
+            return Unauthorized(ApiResponse<object>.Failure(
+                new { code = "EMAIL_NOT_VERIFIED" },
+                "Email chưa được xác thực. Vui lòng kiểm tra hộp thư và click vào link xác thực.",
+                401
+            ));
+        }
 
         // Set refresh token cookie
         SetRefreshTokenCookie(response.RefreshToken);
@@ -158,6 +163,39 @@ public class AuthController : ControllerBase
             null,
             "Đăng xuất thành công"
         ));
+    }
+
+    [AllowAnonymous]
+    [HttpGet("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromQuery] string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return BadRequest(ApiResponse<object>.Failure(null, "Token không hợp lệ", 400));
+
+        await _authService.VerifyEmailAsync(token);
+
+        return Ok(ApiResponse<object>.Success(null, "Xác thực email thành công. Bạn có thể đăng nhập ngay bây giờ."));
+    }
+
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Email))
+            return BadRequest(ApiResponse<object>.Failure(null, "Email không hợp lệ", 400));
+
+        await _authService.ForgotPasswordAsync(dto.Email);
+
+        return Ok(ApiResponse<object>.Success(null, "Nếu email tồn tại, mã OTP đã được gửi. Vui lòng kiểm tra hộp thư."));
+    }
+
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+    {
+        await _authService.ResetPasswordAsync(dto);
+
+        return Ok(ApiResponse<object>.Success(null, "Đặt lại mật khẩu thành công. Vui lòng đăng nhập."));
     }
 
     private void SetRefreshTokenCookie(string refreshToken)

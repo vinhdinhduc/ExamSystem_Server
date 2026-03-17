@@ -70,6 +70,30 @@ public class UserService : IUserService
         return (_mapper.Map<List<UserDto>>(items), total, actualPage, actualPageSize);
     }
 
+    public async Task<(List<UserListItemDto> Items, int Total, int Page, int PageSize)> GetPagedWithRolesAsync(int? page, int? pageSize)
+    {
+        var total = await _userRepository.GetTotalCountAsync();
+
+        int actualPage = page ?? 1;
+        int actualPageSize = pageSize ?? 20;
+
+        if (actualPageSize <= 0) actualPageSize = 20;
+
+        var (items, _) = await _userRepository.GetPagedWithRolesAsync(actualPage, actualPageSize);
+
+        var dtos = items.Select(u => new UserListItemDto(
+            u.Id,
+            u.Username,
+            u.Email,
+            u.FullName,
+            u.IsActive,
+            u.CreatedAt,
+            u.UserRoles.Where(ur => ur.Role != null).Select(ur => ur.Role!.Name).ToList()
+        )).ToList();
+
+        return (dtos, total, actualPage, actualPageSize);
+    }
+
     public async Task<UserDto> CreateAsync(UserCreateDto dto)
     {
         // Check if username already exists
@@ -157,6 +181,17 @@ public class UserService : IUserService
         }
 
         await _userRepository.AssignRolesAsync(id, dto.RoleIds);
+    }
+
+    public async Task<UserDto> ToggleLockAsync(Guid id)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null)
+            throw new KeyNotFoundException($"Người dùng với id '{id}' không tồn tại");
+
+        user.IsActive = !user.IsActive;
+        var updated = await _userRepository.UpdateAsync(user);
+        return _mapper.Map<UserDto>(updated);
     }
 
     public async Task ChangePasswordAsync(Guid id, UserChangePasswordDto dto)

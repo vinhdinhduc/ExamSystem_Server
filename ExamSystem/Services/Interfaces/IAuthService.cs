@@ -9,4 +9,7 @@ public interface IAuthService
     Task<AuthResponseDto> LoginAsync(LoginDto dto);
     Task<AuthResponseDto> RefreshTokenAsync(string refreshToken);
     Task LogoutAsync(string refreshToken);
+    Task VerifyEmailAsync(string token);
+    Task ForgotPasswordAsync(string email);
+    Task ResetPasswordAsync(ResetPasswordDto dto);
 }

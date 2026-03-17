@@ -36,7 +36,6 @@ public class AssignPermissionsToRoleDtoValidator : AbstractValidator<AssignPermi
     public AssignPermissionsToRoleDtoValidator()
     {
         RuleFor(x => x.PermissionIds)
-            .NotNull().WithMessage("PermissionIds is required")
-            .Must(x => x.Count > 0).WithMessage("At least one permission must be assigned");
+            .NotNull().WithMessage("PermissionIds is required");
     }
 }

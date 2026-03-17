@@ -61,6 +61,22 @@ public class UserRepository : IUserRepository
         return (items, total);
     }
 
+    public async Task<(List<User> Items, int Total)> GetPagedWithRolesAsync(int page, int pageSize)
+    {
+        var query = _context.Users
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .OrderBy(u => u.Username);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, total);
+    }
+
     public async Task<bool> ExistsByUsernameAsync(string username)
     {
         return await _context.Users.AnyAsync(u => u.Username == username);
