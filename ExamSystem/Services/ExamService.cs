@@ -29,7 +29,7 @@ public class ExamService : IExamService
         if (exam is null)
         {
             throw new KeyNotFoundException("Exam not found.");
-        }
+    }
 
         return _mapper.Map<ExamDto>(exam);
     }
@@ -67,10 +67,10 @@ public class ExamService : IExamService
     }
 
     public async Task DeleteAsync(Guid id)
-    {
+        {
         var exam = await _examRepository.GetByIdAsync(id);
         if (exam is null)
-        {
+            {
             throw new KeyNotFoundException("Exam not found.");
         }
 
@@ -79,13 +79,30 @@ public class ExamService : IExamService
     }
 
     private static void Validate<T>(T dto)
-    {
+        {
         var context = new ValidationContext(dto!);
         var results = new List<ValidationResult>();
         if (!Validator.TryValidateObject(dto!, context, results, true))
         {
             var message = string.Join("; ", results.Select(result => result.ErrorMessage));
             throw new ValidationException(message);
-        }
+    }
+
+    public async Task<List<StudentAssignedExamDto>> GetStudentAssignedExamsAsync(Guid userId)
+    {
+        var assignments = await _examRepository.GetStudentAssignmentsAsync(userId);
+
+        return assignments
+            .Where(a => a.Exam != null)
+            .Select(a => new StudentAssignedExamDto(
+                a.ExamId,
+                a.Exam.Title,
+                a.Exam.Duration,
+                a.Exam.PassScore,
+                a.Exam.StartDate,
+                a.Exam.EndDate,
+                a.Exam.Status,
+                a.AssignedAt))
+            .ToList();
     }
 }

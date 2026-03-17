@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ExamSystem.DTOs;
 
@@ -17,19 +18,34 @@ public record ExamSessionDto(
     string? IpAddress,
     string? QuestionOrder);
 
-public record ExamSessionCreateDto(
-    Guid ExamId,
+public record StartExamRequestDto(
     Guid UserId,
+    string? AccessCode);
+
+public record StartExamResponseDto(
+    Guid SessionId,
     DateTime StartedAt,
     DateTime ExpiresAt,
-    byte Status,
     int AttemptNumber,
-    string? IpAddress,
-    string? QuestionOrder);
+    List<ExamSessionQuestionDto> Questions);
 
-public record ExamSessionUpdateDto(
-    DateTime? SubmittedAt,
-    byte Status,
-    decimal? Score,
-    bool? IsPassed,
-    int? TotalCorrect);
+public record ExamSessionQuestionDto(
+    Guid QuestionId,
+    int OrderIndex,
+    List<int> AnswerIds);
+
+public record AutoSaveAnswerDto(
+    Guid UserId,
+    Guid QuestionId,
+    List<int> AnswerIds);
+
+public record SubmitExamDto(
+    Guid UserId);
+
+public record SubmitExamResultDto(
+    Guid SessionId,
+    decimal Score,
+    bool IsPassed,
+    int TotalCorrect,
+    DateTime SubmittedAt,
+    byte Status);

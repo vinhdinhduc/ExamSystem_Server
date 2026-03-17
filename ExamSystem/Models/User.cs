@@ -12,6 +12,7 @@ public class User
     public string FullName { get; set; } = string.Empty;
     public string? Avatar { get; set; }
     public bool IsActive { get; set; }
+    public bool IsEmailVerified { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -23,4 +24,6 @@ public class User
     public ICollection<GroupMember> GroupMembers { get; set; } = new List<GroupMember>();
     public ICollection<ExamAssignment> ExamAssignments { get; set; } = new List<ExamAssignment>();
     public ICollection<ExamSession> ExamSessions { get; set; } = new List<ExamSession>();
+    public ICollection<EmailVerificationToken> EmailVerificationTokens { get; set; } = new List<EmailVerificationToken>();
+    public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
 }

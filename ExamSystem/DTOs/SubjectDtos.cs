@@ -21,3 +21,9 @@ public record SubjectUpdateDto(
     string Code,
     string? Description,
     bool IsActive);
+
+public record SubjectFilterDto(
+    string? Keyword,
+    bool? IsActive,
+    int? Page,
+    int? PageSize);
