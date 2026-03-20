@@ -1,4 +1,6 @@
-﻿using ExamSystem.Models;
+﻿using System.Text.Json;
+using ExamSystem.Common;
+using ExamSystem.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,10 +8,17 @@ namespace ExamSystem.Data;
 
 public static class DbSeeder
 {
-    public static async Task SeedDataAsync(ExamSystemDbContext context)
+    public static async Task SeedDataAsync(ExamSystemDbContext context, AdminSettings adminSettings)
     {
+        if (string.IsNullOrWhiteSpace(adminSettings.Username) ||
+            string.IsNullOrWhiteSpace(adminSettings.Email) ||
+            string.IsNullOrWhiteSpace(adminSettings.Password))
+            throw new InvalidOperationException(
+                "AdminSettings chưa được cấu hình. Vui lòng điền đầy đủ Username, Email, Password trong appsettings.json.");
+
         var now = DateTime.UtcNow;
 
+        // ── 1. Permissions ──────────────────────────────────────────────────────
         var permissionDefinitions = new (string Code, string Description)[]
         {
             ("USER_VIEW", "Xem danh sách người dùng"),
@@ -69,16 +78,14 @@ public static class DbSeeder
         {
             await context.Permissions.AddRangeAsync(missingPermissions);
             await context.SaveChangesAsync();
-
-            foreach (var permission in missingPermissions)
-            {
-                permissions[permission.Code] = permission;
-            }
+            foreach (var p in missingPermissions)
+                permissions[p.Code] = p;
         }
 
+        // ── 2. Roles ────────────────────────────────────────────────────────────
         var roleDefinitions = new (string Name, string Description)[]
         {
-            ("Admin", "Quản trị viên hệ thống - Toàn quyền"),
+            ("Admin",   "Quản trị viên hệ thống - Toàn quyền"),
             ("Teacher", "Giáo viên - Quản lý đề thi và câu hỏi"),
             ("Student", "Học sinh - Làm bài thi")
         };
@@ -90,28 +97,21 @@ public static class DbSeeder
 
         var missingRoles = roleDefinitions
             .Where(x => !roles.ContainsKey(x.Name))
-            .Select(x => new Role
-            {
-                Name = x.Name,
-                Description = x.Description,
-                CreatedAt = now
-            })
+            .Select(x => new Role { Name = x.Name, Description = x.Description, CreatedAt = now })
             .ToList();
 
         if (missingRoles.Count > 0)
         {
             await context.Roles.AddRangeAsync(missingRoles);
             await context.SaveChangesAsync();
-
-            foreach (var role in missingRoles)
-            {
-                roles[role.Name] = role;
-            }
+            foreach (var r in missingRoles)
+                roles[r.Name] = r;
         }
 
+        // ── 3. Role-Permission mapping ──────────────────────────────────────────
         var rolePermissionRules = new Dictionary<string, Func<string, bool>>
         {
-            ["Admin"] = _ => true,
+            ["Admin"]   = _ => true,
             ["Teacher"] = code =>
                 code.StartsWith("SUBJECT_") ||
                 code.StartsWith("QUESTION_") ||
@@ -129,14 +129,9 @@ public static class DbSeeder
         foreach (var roleRule in rolePermissionRules)
         {
             var roleId = roles[roleRule.Key].Id;
-
             foreach (var permission in permissions.Values.Where(p => roleRule.Value(p.Code)))
             {
-                var exists = existingRolePermissionPairs.Any(x =>
-                    x.RoleId == roleId &&
-                    x.PermissionId == permission.Id);
-
-                if (!exists)
+                if (!existingRolePermissionPairs.Any(x => x.RoleId == roleId && x.PermissionId == permission.Id))
                 {
                     rolePermissionsToAdd.Add(new RolePermission
                     {
@@ -153,448 +148,319 @@ public static class DbSeeder
             await context.SaveChangesAsync();
         }
 
-        var userDefinitions = new (string Username, string Email, string FullName)[]
-        {
-            ("admin", "admin@examsystem.local", "System Admin"),
-            ("teacher1", "teacher1@examsystem.local", "Teacher One"),
-            ("student1", "student1@examsystem.local", "Student One"),
-            ("student2", "student2@examsystem.local", "Student Two")
-        };
+        // ── 4. Admin user (từ AdminSettings) ────────────────────────────────────
+        var adminUser = await context.Users.FirstOrDefaultAsync(u => u.Username == adminSettings.Username);
 
-        var usernames = userDefinitions.Select(x => x.Username).ToList();
-        var users = await context.Users
-            .Where(u => usernames.Contains(u.Username))
-            .ToDictionaryAsync(u => u.Username);
-
-        if (users.Count < userDefinitions.Length)
+        if (adminUser == null)
         {
             var passwordHasher = new PasswordHasher<User>();
-            var usersToAdd = new List<User>();
-
-            foreach (var userDef in userDefinitions.Where(x => !users.ContainsKey(x.Username)))
+            adminUser = new User
             {
-                var user = new User
-                {
-                    Username = userDef.Username,
-                    Email = userDef.Email,
-                    FullName = userDef.FullName,
-                    IsActive = true,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                };
-
-                user.PasswordHash = passwordHasher.HashPassword(user, "Password@123");
-                usersToAdd.Add(user);
-            }
-
-            await context.Users.AddRangeAsync(usersToAdd);
-            await context.SaveChangesAsync();
-
-            foreach (var user in usersToAdd)
-            {
-                users[user.Username] = user;
-            }
-        }
-
-        var userRolePairs = new (Guid UserId, Guid RoleId)[]
-        {
-            (users["admin"].Id, roles["Admin"].Id),
-            (users["teacher1"].Id, roles["Teacher"].Id),
-            (users["student1"].Id, roles["Student"].Id),
-            (users["student2"].Id, roles["Student"].Id)
-        };
-
-        var existingUserRoles = await context.UserRoles
-            .Select(x => new { x.UserId, x.RoleId })
-            .ToListAsync();
-
-        var userRolesToAdd = userRolePairs
-            .Where(pair => !existingUserRoles.Any(x => x.UserId == pair.UserId && x.RoleId == pair.RoleId))
-            .Select(pair => new UserRole
-            {
-                UserId = pair.UserId,
-                RoleId = pair.RoleId,
-                AssignedAt = now
-            })
-            .ToList();
-
-        if (userRolesToAdd.Count > 0)
-        {
-            await context.UserRoles.AddRangeAsync(userRolesToAdd);
-            await context.SaveChangesAsync();
-        }
-
-        var student1 = users["student1"];
-        var hasRefreshToken = await context.RefreshTokens.AnyAsync(rt => rt.UserId == student1.Id);
-        if (!hasRefreshToken)
-        {
-            await context.RefreshTokens.AddAsync(new RefreshToken
-            {
-                UserId = student1.Id,
-                Token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
-                ExpiresAt = now.AddDays(7),
-                IsRevoked = false,
-                DeviceInfo = "Seeded Device",
-                IpAddress = "127.0.0.1",
-                CreatedAt = now
-            });
-            await context.SaveChangesAsync();
-        }
-
-        var subjectDefinitions = new (string Code, string Name, string Description)[]
-        {
-            ("MATH101", "Toán học cơ bản", "Môn toán nền tảng"),
-            ("PHYS101", "Vật lý cơ bản", "Môn vật lý nền tảng")
-        };
-
-        var subjectCodes = subjectDefinitions.Select(x => x.Code).ToList();
-        var subjects = await context.Subjects
-            .Where(s => subjectCodes.Contains(s.Code))
-            .ToDictionaryAsync(s => s.Code);
-
-        var subjectsToAdd = subjectDefinitions
-            .Where(x => !subjects.ContainsKey(x.Code))
-            .Select(x => new Subject
-            {
-                Code = x.Code,
-                Name = x.Name,
-                Description = x.Description,
-                IsActive = true,
-                CreatedAt = now
-            })
-            .ToList();
-
-        if (subjectsToAdd.Count > 0)
-        {
-            await context.Subjects.AddRangeAsync(subjectsToAdd);
-            await context.SaveChangesAsync();
-
-            foreach (var subject in subjectsToAdd)
-            {
-                subjects[subject.Code] = subject;
-            }
-        }
-
-        var teacher = users["teacher1"];
-        var seededQuestionContents = new[]
-        {
-            "2 + 2 bằng bao nhiêu?",
-            "Số nào là số nguyên tố nhỏ nhất?",
-            "Gia tốc rơi tự do gần đúng trên Trái Đất là bao nhiêu m/s²?"
-        };
-
-        var existingQuestions = await context.Questions
-            .Where(q => seededQuestionContents.Contains(q.Content))
-            .ToDictionaryAsync(q => q.Content);
-
-        var questionsToAdd = new List<Question>();
-
-        if (!existingQuestions.ContainsKey("2 + 2 bằng bao nhiêu?"))
-        {
-            questionsToAdd.Add(new Question
-            {
-                SubjectId = subjects["MATH101"].Id,
-                CreatedByUserId = teacher.Id,
-                Content = "2 + 2 bằng bao nhiêu?",
-                QuestionType = 1,
-                DifficultyLevel = 1,
-                Explanation = "Phép cộng cơ bản",
-                IsActive = true,
-                CreatedAt = now,
-                UpdatedAt = now
-            });
-        }
-
-        if (!existingQuestions.ContainsKey("Số nào là số nguyên tố nhỏ nhất?"))
-        {
-            questionsToAdd.Add(new Question
-            {
-                SubjectId = subjects["MATH101"].Id,
-                CreatedByUserId = teacher.Id,
-                Content = "Số nào là số nguyên tố nhỏ nhất?",
-                QuestionType = 1,
-                DifficultyLevel = 2,
-                Explanation = "Số nguyên tố đầu tiên là 2",
-                IsActive = true,
-                CreatedAt = now,
-                UpdatedAt = now
-            });
-        }
-
-        if (!existingQuestions.ContainsKey("Gia tốc rơi tự do gần đúng trên Trái Đất là bao nhiêu m/s²?"))
-        {
-            questionsToAdd.Add(new Question
-            {
-                SubjectId = subjects["PHYS101"].Id,
-                CreatedByUserId = teacher.Id,
-                Content = "Gia tốc rơi tự do gần đúng trên Trái Đất là bao nhiêu m/s²?",
-                QuestionType = 1,
-                DifficultyLevel = 2,
-                Explanation = "Giá trị gần đúng là 9.8 m/s²",
-                IsActive = true,
-                CreatedAt = now,
-                UpdatedAt = now
-            });
-        }
-
-        if (questionsToAdd.Count > 0)
-        {
-            await context.Questions.AddRangeAsync(questionsToAdd);
-            await context.SaveChangesAsync();
-
-            foreach (var question in questionsToAdd)
-            {
-                existingQuestions[question.Content] = question;
-            }
-        }
-
-        var q1 = existingQuestions["2 + 2 bằng bao nhiêu?"];
-        var q2 = existingQuestions["Số nào là số nguyên tố nhỏ nhất?"];
-        var q3 = existingQuestions["Gia tốc rơi tự do gần đúng trên Trái Đất là bao nhiêu m/s²?"];
-
-        if (!await context.Answers.AnyAsync(a => a.QuestionId == q1.Id))
-        {
-            await context.Answers.AddRangeAsync(new[]
-            {
-                new Answer { QuestionId = q1.Id, Content = "3", IsCorrect = false, OrderIndex = 1 },
-                new Answer { QuestionId = q1.Id, Content = "4", IsCorrect = true, OrderIndex = 2 },
-                new Answer { QuestionId = q1.Id, Content = "5", IsCorrect = false, OrderIndex = 3 },
-                new Answer { QuestionId = q1.Id, Content = "6", IsCorrect = false, OrderIndex = 4 }
-            });
-        }
-
-        if (!await context.Answers.AnyAsync(a => a.QuestionId == q2.Id))
-        {
-            await context.Answers.AddRangeAsync(new[]
-            {
-                new Answer { QuestionId = q2.Id, Content = "1", IsCorrect = false, OrderIndex = 1 },
-                new Answer { QuestionId = q2.Id, Content = "2", IsCorrect = true, OrderIndex = 2 },
-                new Answer { QuestionId = q2.Id, Content = "3", IsCorrect = false, OrderIndex = 3 },
-                new Answer { QuestionId = q2.Id, Content = "5", IsCorrect = false, OrderIndex = 4 }
-            });
-        }
-
-        if (!await context.Answers.AnyAsync(a => a.QuestionId == q3.Id))
-        {
-            await context.Answers.AddRangeAsync(new[]
-            {
-                new Answer { QuestionId = q3.Id, Content = "8.9", IsCorrect = false, OrderIndex = 1 },
-                new Answer { QuestionId = q3.Id, Content = "9.8", IsCorrect = true, OrderIndex = 2 },
-                new Answer { QuestionId = q3.Id, Content = "10.8", IsCorrect = false, OrderIndex = 3 },
-                new Answer { QuestionId = q3.Id, Content = "11.8", IsCorrect = false, OrderIndex = 4 }
-            });
-        }
-
-        await context.SaveChangesAsync();
-
-        var examTitle = "Đề thi thử Toán cơ bản";
-        var exam = await context.Exams.FirstOrDefaultAsync(e => e.Title == examTitle);
-        if (exam == null)
-        {
-            exam = new Exam
-            {
-                SubjectId = subjects["MATH101"].Id,
-                CreatedByUserId = teacher.Id,
-                Title = examTitle,
-                Description = "Đề thi mẫu cho học sinh",
-                Instructions = "Chọn đáp án đúng nhất cho mỗi câu hỏi",
-                Duration = 30,
-                TotalQuestions = 2,
-                PassScore = 5,
-                MaxAttempts = 3,
-                ShuffleQuestions = true,
-                ShuffleAnswers = false,
-                ShowResultAfter = true,
-                ShowCorrectAnswer = true,
-                Status = 1,
-                StartDate = now,
-                EndDate = now.AddDays(30),
-                AccessCode = "MATHDEMO",
-                CreatedAt = now,
-                UpdatedAt = now
+                Username        = adminSettings.Username,
+                Email           = adminSettings.Email,
+                FullName        = adminSettings.FullName,
+                IsActive        = true,
+                IsEmailVerified = true,
+                CreatedAt       = now,
+                UpdatedAt       = now
             };
+            adminUser.PasswordHash = passwordHasher.HashPassword(adminUser, adminSettings.Password);
 
-            await context.Exams.AddAsync(exam);
+            await context.Users.AddAsync(adminUser);
             await context.SaveChangesAsync();
         }
-
-        if (!await context.ExamQuestions.AnyAsync(eq => eq.ExamId == exam.Id && eq.QuestionId == q1.Id))
+        else
         {
-            await context.ExamQuestions.AddAsync(new ExamQuestion
+            var changed = false;
+            if (adminUser.Email != adminSettings.Email)
             {
-                ExamId = exam.Id,
-                QuestionId = q1.Id,
-                OrderIndex = 1,
-                Score = 5
-            });
+                adminUser.Email = adminSettings.Email;
+                changed = true;
+            }
+            if (adminUser.FullName != adminSettings.FullName)
+            {
+                adminUser.FullName = adminSettings.FullName;
+                changed = true;
+            }
+            if (!adminUser.IsEmailVerified || !adminUser.IsActive)
+            {
+                adminUser.IsEmailVerified = true;
+                adminUser.IsActive = true;
+                changed = true;
+            }
+            if (changed)
+                await context.SaveChangesAsync();
         }
 
-        if (!await context.ExamQuestions.AnyAsync(eq => eq.ExamId == exam.Id && eq.QuestionId == q2.Id))
+        // ── 5. Gán role Admin cho admin user ────────────────────────────────────
+        var adminRoleId = roles["Admin"].Id;
+        var hasAdminRole = await context.UserRoles
+            .AnyAsync(ur => ur.UserId == adminUser.Id && ur.RoleId == adminRoleId);
+
+        if (!hasAdminRole)
         {
-            await context.ExamQuestions.AddAsync(new ExamQuestion
+            await context.UserRoles.AddAsync(new UserRole
             {
-                ExamId = exam.Id,
-                QuestionId = q2.Id,
-                OrderIndex = 2,
-                Score = 5
-            });
-        }
-
-        await context.SaveChangesAsync();
-
-        var group = await context.Groups.FirstOrDefaultAsync(g => g.Code == "GRP10A1");
-        if (group == null)
-        {
-            group = new Group
-            {
-                Name = "Lớp 10A1",
-                Code = "GRP10A1",
-                Description = "Nhóm học sinh lớp 10A1",
-                CreatedByUserId = teacher.Id,
-                CreatedAt = now
-            };
-
-            await context.Groups.AddAsync(group);
-            await context.SaveChangesAsync();
-        }
-
-        var student2 = users["student2"];
-
-        if (!await context.GroupMembers.AnyAsync(gm => gm.GroupId == group.Id && gm.UserId == student1.Id))
-        {
-            await context.GroupMembers.AddAsync(new GroupMember
-            {
-                GroupId = group.Id,
-                UserId = student1.Id,
-                JoinedAt = now
-            });
-        }
-
-        if (!await context.GroupMembers.AnyAsync(gm => gm.GroupId == group.Id && gm.UserId == student2.Id))
-        {
-            await context.GroupMembers.AddAsync(new GroupMember
-            {
-                GroupId = group.Id,
-                UserId = student2.Id,
-                JoinedAt = now
-            });
-        }
-
-        await context.SaveChangesAsync();
-
-        if (!await context.ExamAssignments.AnyAsync(a => a.ExamId == exam.Id && a.UserId == student1.Id && a.GroupId == null))
-        {
-            await context.ExamAssignments.AddAsync(new ExamAssignment
-            {
-                ExamId = exam.Id,
-                UserId = student1.Id,
-                GroupId = null,
+                UserId     = adminUser.Id,
+                RoleId     = adminRoleId,
                 AssignedAt = now
             });
+            await context.SaveChangesAsync();
         }
 
-        if (!await context.ExamAssignments.AnyAsync(a => a.ExamId == exam.Id && a.GroupId == group.Id))
+        // ── 6. Seed sample domain data (idempotent) ─────────────────────────────
+        await SeedSampleDomainDataAsync(context, roles, adminUser, now);
+    }
+
+    private static async Task SeedSampleDomainDataAsync(
+        ExamSystemDbContext context,
+        Dictionary<string, Role> roles,
+        User adminUser,
+        DateTime now)
+    {
+        if (await context.Subjects.AnyAsync(s => s.Code == "CSDL"))
+            return;
+
+        var passwordHasher = new PasswordHasher<User>();
+
+        // Subjects
+        var subjects = new List<Subject>
         {
-            await context.ExamAssignments.AddAsync(new ExamAssignment
-            {
-                ExamId = exam.Id,
-                UserId = null,
-                GroupId = group.Id,
-                AssignedAt = now
-            });
-        }
-
+            new() { Name = "Cơ sở dữ liệu", Code = "CSDL", Description = "Kiến thức SQL Server", IsActive = true, CreatedAt = now },
+            new() { Name = "Lập trình Web", Code = "LTW", Description = "ASP.NET Core và Web API", IsActive = true, CreatedAt = now },
+            new() { Name = "Cấu trúc dữ liệu", Code = "CTDL", Description = "Thuật toán và cấu trúc dữ liệu", IsActive = true, CreatedAt = now }
+        };
+        await context.Subjects.AddRangeAsync(subjects);
         await context.SaveChangesAsync();
 
-        var session = await context.ExamSessions
-            .FirstOrDefaultAsync(s => s.ExamId == exam.Id && s.UserId == student1.Id && s.AttemptNumber == 1);
+        var csdlSubject = subjects.First(s => s.Code == "CSDL");
+        var ltwSubject = subjects.First(s => s.Code == "LTW");
 
-        if (session == null)
+        // Users
+        var teacher = new User
         {
-            session = new ExamSession
-            {
-                ExamId = exam.Id,
-                UserId = student1.Id,
-                StartedAt = now.AddMinutes(-25),
-                SubmittedAt = now.AddMinutes(-5),
-                ExpiresAt = now.AddMinutes(5),
-                Status = 2,
-                Score = 10,
-                IsPassed = true,
-                TotalCorrect = 2,
-                AttemptNumber = 1,
-                IpAddress = "127.0.0.1",
-                QuestionOrder = "1,2"
-            };
+            Username = "teacher.demo",
+            Email = "teacher.demo@examsystem.local",
+            FullName = "Demo Teacher",
+            IsActive = true,
+            IsEmailVerified = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        teacher.PasswordHash = passwordHasher.HashPassword(teacher, "Teacher@123");
 
-            await context.ExamSessions.AddAsync(session);
-            await context.SaveChangesAsync();
-        }
-
-        var answersQ1 = await context.Answers.Where(a => a.QuestionId == q1.Id).ToListAsync();
-        var answersQ2 = await context.Answers.Where(a => a.QuestionId == q2.Id).ToListAsync();
-
-        var q1CorrectIds = string.Join(',', answersQ1.Where(a => a.IsCorrect).Select(a => a.Id));
-        var q2CorrectIds = string.Join(',', answersQ2.Where(a => a.IsCorrect).Select(a => a.Id));
-
-        var sessionAnswerQ1 = await context.SessionAnswers
-            .FirstOrDefaultAsync(sa => sa.SessionId == session.Id && sa.QuestionId == q1.Id);
-        if (sessionAnswerQ1 == null)
+        var student1 = new User
         {
-            sessionAnswerQ1 = new SessionAnswer
-            {
-                SessionId = session.Id,
-                QuestionId = q1.Id,
-                CorrectAnswerIds = q1CorrectIds,
-                IsCorrect = true,
-                Score = 5,
-                AnsweredAt = now.AddMinutes(-15)
-            };
+            Username = "student.one",
+            Email = "student.one@examsystem.local",
+            FullName = "Student One",
+            IsActive = true,
+            IsEmailVerified = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        student1.PasswordHash = passwordHasher.HashPassword(student1, "Student@123");
 
-            await context.SessionAnswers.AddAsync(sessionAnswerQ1);
-            await context.SaveChangesAsync();
-        }
-
-        var sessionAnswerQ2 = await context.SessionAnswers
-            .FirstOrDefaultAsync(sa => sa.SessionId == session.Id && sa.QuestionId == q2.Id);
-        if (sessionAnswerQ2 == null)
+        var student2 = new User
         {
-            sessionAnswerQ2 = new SessionAnswer
-            {
-                SessionId = session.Id,
-                QuestionId = q2.Id,
-                CorrectAnswerIds = q2CorrectIds,
-                IsCorrect = true,
-                Score = 5,
-                AnsweredAt = now.AddMinutes(-10)
-            };
+            Username = "student.two",
+            Email = "student.two@examsystem.local",
+            FullName = "Student Two",
+            IsActive = true,
+            IsEmailVerified = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        student2.PasswordHash = passwordHasher.HashPassword(student2, "Student@123");
 
-            await context.SessionAnswers.AddAsync(sessionAnswerQ2);
-            await context.SaveChangesAsync();
-        }
+        await context.Users.AddRangeAsync(teacher, student1, student2);
+        await context.SaveChangesAsync();
 
-        var selectedQ1 = answersQ1.First(a => a.IsCorrect);
-        var selectedQ2 = answersQ2.First(a => a.IsCorrect);
-
-        if (!await context.SessionAnswerDetails.AnyAsync(d => d.SessionAnswerId == sessionAnswerQ1.Id && d.AnswerId == selectedQ1.Id))
+        // User roles
+        var userRoles = new List<UserRole>
         {
-            await context.SessionAnswerDetails.AddAsync(new SessionAnswerDetail
-            {
-                SessionAnswerId = sessionAnswerQ1.Id,
-                AnswerId = selectedQ1.Id,
-                SelectedAt = now.AddMinutes(-15)
-            });
-        }
+            new() { UserId = teacher.Id, RoleId = roles["Teacher"].Id, AssignedAt = now },
+            new() { UserId = student1.Id, RoleId = roles["Student"].Id, AssignedAt = now },
+            new() { UserId = student2.Id, RoleId = roles["Student"].Id, AssignedAt = now }
+        };
+        await context.UserRoles.AddRangeAsync(userRoles);
+        await context.SaveChangesAsync();
 
-        if (!await context.SessionAnswerDetails.AnyAsync(d => d.SessionAnswerId == sessionAnswerQ2.Id && d.AnswerId == selectedQ2.Id))
+        // Questions + Answers
+        var q1 = new Question
         {
-            await context.SessionAnswerDetails.AddAsync(new SessionAnswerDetail
-            {
-                SessionAnswerId = sessionAnswerQ2.Id,
-                AnswerId = selectedQ2.Id,
-                SelectedAt = now.AddMinutes(-10)
-            });
-        }
+            SubjectId = csdlSubject.Id,
+            CreatedByUserId = teacher.Id,
+            Content = "Câu lệnh nào dùng để truy vấn dữ liệu trong SQL Server?",
+            QuestionType = 0,
+            DifficultyLevel = 1,
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Explanation = "SELECT dùng để truy vấn dữ liệu"
+        };
+        q1.Answers = new List<Answer>
+        {
+            new() { Content = "SELECT", IsCorrect = true, OrderIndex = 0 },
+            new() { Content = "INSERT", IsCorrect = false, OrderIndex = 1 },
+            new() { Content = "UPDATE", IsCorrect = false, OrderIndex = 2 },
+            new() { Content = "DELETE", IsCorrect = false, OrderIndex = 3 }
+        };
+
+        var q2 = new Question
+        {
+            SubjectId = csdlSubject.Id,
+            CreatedByUserId = teacher.Id,
+            Content = "Khóa chính (Primary Key) có đặc điểm nào đúng?",
+            QuestionType = 0,
+            DifficultyLevel = 1,
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Explanation = "Primary Key phải duy nhất và không null"
+        };
+        q2.Answers = new List<Answer>
+        {
+            new() { Content = "Cho phép trùng giá trị", IsCorrect = false, OrderIndex = 0 },
+            new() { Content = "Không được null và duy nhất", IsCorrect = true, OrderIndex = 1 },
+            new() { Content = "Luôn là kiểu nvarchar", IsCorrect = false, OrderIndex = 2 },
+            new() { Content = "Không tạo index", IsCorrect = false, OrderIndex = 3 }
+        };
+
+        var q3 = new Question
+        {
+            SubjectId = ltwSubject.Id,
+            CreatedByUserId = teacher.Id,
+            Content = "Trong ASP.NET Core, middleware dùng để làm gì?",
+            QuestionType = 0,
+            DifficultyLevel = 2,
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Explanation = "Middleware xử lý request/response pipeline"
+        };
+        q3.Answers = new List<Answer>
+        {
+            new() { Content = "Render giao diện frontend", IsCorrect = false, OrderIndex = 0 },
+            new() { Content = "Xử lý pipeline HTTP request/response", IsCorrect = true, OrderIndex = 1 },
+            new() { Content = "Thay thế DbContext", IsCorrect = false, OrderIndex = 2 },
+            new() { Content = "Chỉ dùng cho logging", IsCorrect = false, OrderIndex = 3 }
+        };
+
+        await context.Questions.AddRangeAsync(q1, q2, q3);
+        await context.SaveChangesAsync();
+
+        // Exam + ExamQuestions
+        var exam = new Exam
+        {
+            SubjectId = csdlSubject.Id,
+            CreatedByUserId = teacher.Id,
+            Title = "Đề thi thử SQL Server cơ bản",
+            Description = "Đề mẫu cho học sinh thực hành",
+            Instructions = "Chọn đáp án đúng nhất cho mỗi câu",
+            Duration = 30,
+            TotalQuestions = 2,
+            PassScore = 50,
+            MaxAttempts = 2,
+            ShuffleQuestions = true,
+            ShuffleAnswers = true,
+            ShowResultAfter = true,
+            ShowCorrectAnswer = true,
+            Status = 1,
+            StartDate = now.AddDays(-1),
+            EndDate = now.AddDays(10),
+            AccessCode = "SQL2025",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        await context.Exams.AddAsync(exam);
+        await context.SaveChangesAsync();
+
+        var examQuestions = new List<ExamQuestion>
+        {
+            new() { ExamId = exam.Id, QuestionId = q1.Id, OrderIndex = 1, Score = 5 },
+            new() { ExamId = exam.Id, QuestionId = q2.Id, OrderIndex = 2, Score = 5 }
+        };
+        await context.ExamQuestions.AddRangeAsync(examQuestions);
+        await context.SaveChangesAsync();
+
+        // Group + Members
+        var group = new Group
+        {
+            Name = "Lớp CNTT K20A",
+            Code = "CNTT-K20A",
+            Description = "Nhóm học sinh demo",
+            CreatedByUserId = teacher.Id,
+            CreatedAt = now
+        };
+        await context.Groups.AddAsync(group);
+        await context.SaveChangesAsync();
+
+        await context.GroupMembers.AddRangeAsync(
+            new GroupMember { GroupId = group.Id, UserId = student1.Id, JoinedAt = now },
+            new GroupMember { GroupId = group.Id, UserId = student2.Id, JoinedAt = now });
+        await context.SaveChangesAsync();
+
+        // Assignments
+        await context.ExamAssignments.AddRangeAsync(
+            new ExamAssignment { ExamId = exam.Id, GroupId = group.Id, AssignedAt = now },
+            new ExamAssignment { ExamId = exam.Id, UserId = student1.Id, AssignedAt = now });
+        await context.SaveChangesAsync();
+
+        // Sample Exam Session for student1
+        var sessionStartedAt = now.AddHours(-1);
+        var session = new ExamSession
+        {
+            ExamId = exam.Id,
+            UserId = student1.Id,
+            StartedAt = sessionStartedAt,
+            SubmittedAt = now.AddMinutes(-20),
+            ExpiresAt = sessionStartedAt.AddMinutes(exam.Duration),
+            Status = 1,
+            AttemptNumber = 1,
+            QuestionOrder = JsonSerializer.Serialize(new List<Guid> { q1.Id, q2.Id }),
+            IpAddress = "127.0.0.1"
+        };
+        await context.ExamSessions.AddAsync(session);
+        await context.SaveChangesAsync();
+
+        var q1CorrectIds = q1.Answers.Where(a => a.IsCorrect).Select(a => a.Id).ToList();
+        var q2CorrectIds = q2.Answers.Where(a => a.IsCorrect).Select(a => a.Id).ToList();
+
+        var sessionAnswer1 = new SessionAnswer
+        {
+            SessionId = session.Id,
+            QuestionId = q1.Id,
+            CorrectAnswerIds = JsonSerializer.Serialize(q1CorrectIds),
+            IsCorrect = true,
+            Score = 5,
+            AnsweredAt = now.AddMinutes(-40)
+        };
+
+        var sessionAnswer2 = new SessionAnswer
+        {
+            SessionId = session.Id,
+            QuestionId = q2.Id,
+            CorrectAnswerIds = JsonSerializer.Serialize(q2CorrectIds),
+            IsCorrect = false,
+            Score = 0,
+            AnsweredAt = now.AddMinutes(-35)
+        };
+
+        await context.SessionAnswers.AddRangeAsync(sessionAnswer1, sessionAnswer2);
+        await context.SaveChangesAsync();
+
+        var q1Selected = q1.Answers.First(a => a.IsCorrect);
+        var q2Selected = q2.Answers.First(a => !a.IsCorrect);
+
+        await context.SessionAnswerDetails.AddRangeAsync(
+            new SessionAnswerDetail { SessionAnswerId = sessionAnswer1.Id, AnswerId = q1Selected.Id, SelectedAt = now.AddMinutes(-40) },
+            new SessionAnswerDetail { SessionAnswerId = sessionAnswer2.Id, AnswerId = q2Selected.Id, SelectedAt = now.AddMinutes(-35) });
+
+        session.TotalCorrect = 1;
+        session.Score = 50;
+        session.IsPassed = true;
 
         await context.SaveChangesAsync();
     }

@@ -1,4 +1,4 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using ExamSystem.Common;
 using ExamSystem.DTOs;
 using ExamSystem.Services.Interfaces;
@@ -18,19 +18,21 @@ public class GroupsController : ControllerBase
     private readonly IValidator<GroupCreateDto> _createValidator;
     private readonly IValidator<GroupUpdateDto> _updateValidator;
     private readonly IValidator<AddGroupMemberDto> _addMemberValidator;
+    private readonly ILogger<GroupsController> _logger;
 
     public GroupsController(
         IGroupService groupService,
         IValidator<GroupCreateDto> createValidator,
         IValidator<GroupUpdateDto> updateValidator,
-        IValidator<AddGroupMemberDto> addMemberValidator)
+        IValidator<AddGroupMemberDto> addMemberValidator,
+        ILogger<GroupsController> logger)
     {
         _groupService = groupService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _addMemberValidator = addMemberValidator;
+        _logger = logger;
     }
-
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] GroupFilterDto filter)
     {
@@ -51,7 +53,7 @@ public class GroupsController : ControllerBase
 
         return Ok(ApiResponse<PaginatedResult<GroupDto>>.Success(
             paginatedResult,
-            "Groups retrieved successfully"
+            "Lấy danh sách nhóm lớp thành công"
         ));
     }
 
@@ -62,21 +64,22 @@ public class GroupsController : ControllerBase
         if (group == null)
         {
             return NotFound(ApiResponse<object>.Failure(
-                new NotFoundError { Resource = $"Group with id '{id}'" },
-                "Group not found",
+                new NotFoundError { Resource = $"Nhóm lớp với id '{id}'" },
+                "Không tìm thấy nhóm lớp",
                 404
             ));
         }
 
         return Ok(ApiResponse<GroupDto>.Success(
             group,
-            "Group retrieved successfully"
+            "Lấy thông tin nhóm lớp thành công"
         ));
     }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] GroupCreateDto dto)
     {
+
         var validationResult = await _createValidator.ValidateAsync(dto);
         if (!validationResult.IsValid)
         {
@@ -89,7 +92,7 @@ public class GroupsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -98,7 +101,7 @@ public class GroupsController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = group.Id },
-            ApiResponse<GroupDto>.Success(group, "Group created successfully", 201)
+            ApiResponse<GroupDto>.Success(group, "Tạo nhóm lớp thành công", 201)
         );
     }
 
@@ -117,7 +120,7 @@ public class GroupsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -125,7 +128,7 @@ public class GroupsController : ControllerBase
         var group = await _groupService.UpdateAsync(id, dto);
         return Ok(ApiResponse<GroupDto>.Success(
             group,
-            "Group updated successfully"
+            "Cập nhật nhóm lớp thành công"
         ));
     }
 
@@ -135,7 +138,7 @@ public class GroupsController : ControllerBase
         await _groupService.DeleteAsync(id);
         return Ok(ApiResponse<object>.Success(
             null,
-            "Group deleted successfully"
+            "Xóa nhóm lớp thành công"
         ));
     }
 
@@ -154,7 +157,7 @@ public class GroupsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -162,7 +165,7 @@ public class GroupsController : ControllerBase
         await _groupService.AddMemberAsync(id, dto);
         return Ok(ApiResponse<object>.Success(
             null,
-            "Group member added successfully"
+            "Thêm thành viên vào nhóm lớp thành công"
         ));
     }
 
@@ -172,7 +175,7 @@ public class GroupsController : ControllerBase
         await _groupService.RemoveMemberAsync(id, userId);
         return Ok(ApiResponse<object>.Success(
             null,
-            "Group member removed successfully"
+            "Xóa thành viên khỏi nhóm lớp thành công"
         ));
     }
 }

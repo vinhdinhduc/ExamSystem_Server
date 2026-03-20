@@ -72,11 +72,11 @@ public class GlobalExceptionMiddleware
                 message = businessEx.Message,
                 data = (object?)null
             },
-            UnauthorizedAccessException => new
+            UnauthorizedAccessException unauthorizedEx => new
             {
                 statusCode = 401,
-                error = new UnauthorizedError(),
-                message = "Unauthorized access",
+                error = new UnauthorizedError { Reason = unauthorizedEx.Message },
+                message = unauthorizedEx.Message,
                 data = (object?)null
             },
             _ => new

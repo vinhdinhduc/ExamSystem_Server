@@ -1,4 +1,4 @@
-using ExamSystem.DTOs;
+﻿using ExamSystem.DTOs;
 using FluentValidation;
 
 namespace ExamSystem.Validators;
@@ -8,44 +8,44 @@ public class ExamCreateDtoValidator : AbstractValidator<ExamCreateDto>
     public ExamCreateDtoValidator()
     {
         RuleFor(x => x.SubjectId)
-            .GreaterThan(0).WithMessage("SubjectId must be greater than 0");
+            .GreaterThan(0).WithMessage("Mã môn học phải lớn hơn 0");
 
         RuleFor(x => x.CreatedByUserId)
-            .NotEmpty().WithMessage("CreatedByUserId is required");
+            .NotEmpty().WithMessage("Người tạo đề không được để trống");
 
         RuleFor(x => x.Title)
-            .NotEmpty().WithMessage("Title is required")
-            .MaximumLength(255).WithMessage("Title must not exceed 255 characters");
+            .NotEmpty().WithMessage("Tiêu đề đề thi không được để trống")
+            .MaximumLength(255).WithMessage("Tiêu đề đề thi không được vượt quá 255 ký tự");
 
         RuleFor(x => x.Description)
-            .MaximumLength(1000).WithMessage("Description must not exceed 1000 characters")
+            .MaximumLength(1000).WithMessage("Mô tả không được vượt quá 1000 ký tự")
             .When(x => !string.IsNullOrWhiteSpace(x.Description));
 
         RuleFor(x => x.Instructions)
-            .MaximumLength(2000).WithMessage("Instructions must not exceed 2000 characters")
+            .MaximumLength(2000).WithMessage("Hướng dẫn làm bài không được vượt quá 2000 ký tự")
             .When(x => !string.IsNullOrWhiteSpace(x.Instructions));
 
         RuleFor(x => x.Duration)
-            .GreaterThan(0).WithMessage("Duration must be greater than 0");
+            .GreaterThan(0).WithMessage("Thời gian làm bài phải lớn hơn 0");
 
         RuleFor(x => x.TotalQuestions)
-            .GreaterThan(0).WithMessage("TotalQuestions must be greater than 0");
+            .GreaterThan(0).WithMessage("Tổng số câu hỏi phải lớn hơn 0");
 
         RuleFor(x => x.PassScore)
-            .GreaterThanOrEqualTo(0).WithMessage("PassScore must be greater than or equal to 0");
+            .GreaterThanOrEqualTo(0).WithMessage("Điểm đạt phải lớn hơn hoặc bằng 0");
 
         RuleFor(x => x.MaxAttempts)
-            .GreaterThan(0).WithMessage("MaxAttempts must be greater than 0");
+            .GreaterThan(0).WithMessage("Số lần làm tối đa phải lớn hơn 0");
 
         RuleFor(x => x.Status)
-            .InclusiveBetween((byte)0, (byte)2).WithMessage("Status is invalid");
+            .InclusiveBetween((byte)0, (byte)2).WithMessage("Trạng thái không hợp lệ");
 
         RuleFor(x => x)
             .Must(x => !x.StartDate.HasValue || !x.EndDate.HasValue || x.EndDate.Value >= x.StartDate.Value)
-            .WithMessage("EndDate must be greater than or equal to StartDate");
+            .WithMessage("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu");
 
         RuleFor(x => x.AccessCode)
-            .MaximumLength(50).WithMessage("AccessCode must not exceed 50 characters")
+            .MaximumLength(50).WithMessage("Mã truy cập không được vượt quá 50 ký tự")
             .When(x => !string.IsNullOrWhiteSpace(x.AccessCode));
     }
 }
@@ -55,38 +55,38 @@ public class ExamUpdateDtoValidator : AbstractValidator<ExamUpdateDto>
     public ExamUpdateDtoValidator()
     {
         RuleFor(x => x.Title)
-            .NotEmpty().WithMessage("Title is required")
-            .MaximumLength(255).WithMessage("Title must not exceed 255 characters");
+            .NotEmpty().WithMessage("Tiêu đề đề thi không được để trống")
+            .MaximumLength(255).WithMessage("Tiêu đề đề thi không được vượt quá 255 ký tự");
 
         RuleFor(x => x.Description)
-            .MaximumLength(1000).WithMessage("Description must not exceed 1000 characters")
+            .MaximumLength(1000).WithMessage("Mô tả không được vượt quá 1000 ký tự")
             .When(x => !string.IsNullOrWhiteSpace(x.Description));
 
         RuleFor(x => x.Instructions)
-            .MaximumLength(2000).WithMessage("Instructions must not exceed 2000 characters")
+            .MaximumLength(2000).WithMessage("Hướng dẫn làm bài không được vượt quá 2000 ký tự")
             .When(x => !string.IsNullOrWhiteSpace(x.Instructions));
 
         RuleFor(x => x.Duration)
-            .GreaterThan(0).WithMessage("Duration must be greater than 0");
+            .GreaterThan(0).WithMessage("Thời gian làm bài phải lớn hơn 0");
 
         RuleFor(x => x.TotalQuestions)
-            .GreaterThan(0).WithMessage("TotalQuestions must be greater than 0");
+            .GreaterThan(0).WithMessage("Tổng số câu hỏi phải lớn hơn 0");
 
         RuleFor(x => x.PassScore)
-            .GreaterThanOrEqualTo(0).WithMessage("PassScore must be greater than or equal to 0");
+            .GreaterThanOrEqualTo(0).WithMessage("Điểm đạt phải lớn hơn hoặc bằng 0");
 
         RuleFor(x => x.MaxAttempts)
-            .GreaterThan(0).WithMessage("MaxAttempts must be greater than 0");
+            .GreaterThan(0).WithMessage("Số lần làm tối đa phải lớn hơn 0");
 
         RuleFor(x => x.Status)
-            .InclusiveBetween((byte)0, (byte)2).WithMessage("Status is invalid");
+            .InclusiveBetween((byte)0, (byte)2).WithMessage("Trạng thái không hợp lệ");
 
         RuleFor(x => x)
             .Must(x => !x.StartDate.HasValue || !x.EndDate.HasValue || x.EndDate.Value >= x.StartDate.Value)
-            .WithMessage("EndDate must be greater than or equal to StartDate");
+            .WithMessage("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu");
 
         RuleFor(x => x.AccessCode)
-            .MaximumLength(50).WithMessage("AccessCode must not exceed 50 characters")
+            .MaximumLength(50).WithMessage("Mã truy cập không được vượt quá 50 ký tự")
             .When(x => !string.IsNullOrWhiteSpace(x.AccessCode));
     }
 }
@@ -96,13 +96,17 @@ public class ExamQuestionCreateDtoValidator : AbstractValidator<ExamQuestionCrea
     public ExamQuestionCreateDtoValidator()
     {
         RuleFor(x => x.QuestionId)
-            .NotEmpty().WithMessage("QuestionId is required");
+            .NotEmpty().WithMessage("Câu hỏi không được để trống");
 
         RuleFor(x => x.OrderIndex)
-            .GreaterThan(0).WithMessage("OrderIndex must be greater than 0");
+            .GreaterThan(0)
+            .When(x => x.OrderIndex.HasValue)
+            .WithMessage("Thứ tự câu hỏi phải lớn hơn 0");
 
         RuleFor(x => x.Score)
-            .GreaterThan(0).WithMessage("Score must be greater than 0");
+            .GreaterThan(0)
+            .When(x => x.Score.HasValue)
+            .WithMessage("Điểm số phải lớn hơn 0");
     }
 }
 
@@ -111,16 +115,16 @@ public class ReorderExamQuestionsDtoValidator : AbstractValidator<ReorderExamQue
     public ReorderExamQuestionsDtoValidator()
     {
         RuleFor(x => x.Items)
-            .NotNull().WithMessage("Items is required")
-            .Must(items => items.Count > 0).WithMessage("Items must not be empty");
+            .NotNull().WithMessage("Danh sách sắp xếp không được để trống")
+            .Must(items => items.Count > 0).WithMessage("Danh sách sắp xếp không được rỗng");
 
         RuleForEach(x => x.Items).ChildRules(item =>
         {
             item.RuleFor(i => i.ExamQuestionId)
-                .GreaterThan(0).WithMessage("ExamQuestionId must be greater than 0");
+                .GreaterThan(0).WithMessage("Mã câu hỏi trong đề phải lớn hơn 0");
 
             item.RuleFor(i => i.OrderIndex)
-                .GreaterThan(0).WithMessage("OrderIndex must be greater than 0");
+                .GreaterThan(0).WithMessage("Thứ tự câu hỏi phải lớn hơn 0");
         });
     }
 }
@@ -130,7 +134,7 @@ public class PublishExamDtoValidator : AbstractValidator<PublishExamDto>
     public PublishExamDtoValidator()
     {
         RuleFor(x => x.PublishedByUserId)
-            .NotEmpty().WithMessage("PublishedByUserId is required");
+            .NotEmpty().WithMessage("Người xuất bản không được để trống");
     }
 }
 
@@ -140,14 +144,14 @@ public class ExamAssignmentCreateDtoValidator : AbstractValidator<ExamAssignment
     {
         RuleFor(x => x)
             .Must(x => x.UserId.HasValue || x.GroupId.HasValue)
-            .WithMessage("Must assign exam to user or group");
+            .WithMessage("Phải phân công đề thi cho người dùng hoặc nhóm");
 
         RuleFor(x => x.GroupId)
             .GreaterThan(0).When(x => x.GroupId.HasValue)
-            .WithMessage("GroupId must be greater than 0");
+            .WithMessage("Mã nhóm phải lớn hơn 0");
 
         RuleFor(x => x)
             .Must(x => !(x.UserId.HasValue && x.GroupId.HasValue))
-            .WithMessage("Only one target assignment is allowed: user or group");
+            .WithMessage("Chỉ được phân công cho một đối tượng: người dùng hoặc nhóm");
     }
 }

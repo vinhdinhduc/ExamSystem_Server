@@ -17,6 +17,7 @@ public class GroupRepository : IGroupRepository
     public Task<Group?> GetByIdAsync(int id)
         => _context.Groups
             .Include(g => g.GroupMembers)
+            .ThenInclude(m => m.User)
             .FirstOrDefaultAsync(g => g.Id == id);
 
     public Task<Group?> GetByCodeAsync(string code)
@@ -26,6 +27,7 @@ public class GroupRepository : IGroupRepository
     {
         var query = _context.Groups
             .Include(g => g.GroupMembers)
+            .ThenInclude(m => m.User)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(keyword))

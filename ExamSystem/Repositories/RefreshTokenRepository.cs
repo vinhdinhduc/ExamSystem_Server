@@ -38,6 +38,25 @@ public class RefreshTokenRepository : IRefreshTokenRepository
         return refreshToken;
     }
 
+    public async Task DeleteAsync(RefreshToken refreshToken)
+    {
+        _context.RefreshTokens.Remove(refreshToken);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DeleteAllUserTokensAsync(Guid userId)
+    {
+        var tokens = await _context.RefreshTokens
+            .Where(rt => rt.UserId == userId)
+            .ToListAsync();
+
+        if (tokens.Count > 0)
+        {
+            _context.RefreshTokens.RemoveRange(tokens);
+            await _context.SaveChangesAsync();
+        }
+    }
+
     public async Task RevokeAllUserTokensAsync(Guid userId)
     {
         var tokens = await _context.RefreshTokens

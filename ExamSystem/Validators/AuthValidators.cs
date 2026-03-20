@@ -1,4 +1,4 @@
-using ExamSystem.DTOs;
+﻿using ExamSystem.DTOs;
 using FluentValidation;
 
 namespace ExamSystem.Validators;
@@ -7,24 +7,23 @@ public class RegisterDtoValidator : AbstractValidator<RegisterDto>
 {
     public RegisterDtoValidator()
     {
-        RuleFor(x => x.Username)
-            .NotEmpty().WithMessage("Username is required")
-            .MaximumLength(50).WithMessage("Username cannot exceed 50 characters")
-            .Matches("^[a-zA-Z0-9_]+$").WithMessage("Username can only contain letters, numbers, and underscores");
-
         RuleFor(x => x.Email)
-            .NotEmpty().WithMessage("Email is required")
-            .EmailAddress().WithMessage("Invalid email format")
-            .MaximumLength(100).WithMessage("Email cannot exceed 100 characters");
+            .NotEmpty().WithMessage("Email không được để trống")
+            .EmailAddress().WithMessage("Email không hợp lệ")
+            .MaximumLength(100).WithMessage("Email không được vượt quá 100 ký tự");
 
         RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required")
-            .MinimumLength(6).WithMessage("Password must be at least 6 characters")
-            .MaximumLength(50).WithMessage("Password cannot exceed 50 characters");
+            .NotEmpty().WithMessage("Mật khẩu không được để trống")
+            .MinimumLength(6).WithMessage("Mật khẩu tối thiểu 6 ký tự")
+            .MaximumLength(50).WithMessage("Mật khẩu không được vượt quá 50 ký tự");
+
+        RuleFor(x => x.Username)
+            .MaximumLength(50).WithMessage("Tên đăng nhập không được vượt quá 50 ký tự")
+            .When(x => x.Username != null);
 
         RuleFor(x => x.FullName)
-            .NotEmpty().WithMessage("Full name is required")
-            .MaximumLength(100).WithMessage("Full name cannot exceed 100 characters");
+            .MaximumLength(100).WithMessage("Họ tên không được vượt quá 100 ký tự")
+            .When(x => x.FullName != null);
     }
 }
 
@@ -33,10 +32,10 @@ public class LoginDtoValidator : AbstractValidator<LoginDto>
     public LoginDtoValidator()
     {
         RuleFor(x => x.UsernameOrEmail)
-            .NotEmpty().WithMessage("Username or email is required");
+            .NotEmpty().WithMessage("Tên đăng nhập hoặc email không được để trống");
 
         RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required");
+            .NotEmpty().WithMessage("Mật khẩu không được để trống");
     }
 }
 
@@ -45,7 +44,7 @@ public class RefreshTokenRequestDtoValidator : AbstractValidator<RefreshTokenReq
     public RefreshTokenRequestDtoValidator()
     {
         RuleFor(x => x.RefreshToken)
-            .NotEmpty().WithMessage("Refresh token is required");
+            .NotEmpty().WithMessage("Refresh token không được để trống");
     }
 }
 
@@ -54,6 +53,6 @@ public class LogoutDtoValidator : AbstractValidator<LogoutDto>
     public LogoutDtoValidator()
     {
         RuleFor(x => x.RefreshToken)
-            .NotEmpty().WithMessage("Refresh token is required");
+            .NotEmpty().WithMessage("Refresh token không được để trống");
     }
 }

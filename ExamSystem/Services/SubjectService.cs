@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using ExamSystem.DTOs;
 using ExamSystem.Models;
 using ExamSystem.Repositories.Interfaces;
@@ -39,7 +39,7 @@ public class SubjectService : ISubjectService
         var existing = await _subjectRepository.GetByCodeAsync(dto.Code);
         if (existing != null)
         {
-            throw new InvalidOperationException($"Subject code '{dto.Code}' already exists");
+            throw new InvalidOperationException($"Mã môn học '{dto.Code}' đã tồn tại");
         }
 
         var subject = _mapper.Map<Subject>(dto);
@@ -54,13 +54,13 @@ public class SubjectService : ISubjectService
         var subject = await _subjectRepository.GetByIdAsync(id);
         if (subject == null)
         {
-            throw new KeyNotFoundException($"Subject with id '{id}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy môn học với id '{id}'");
         }
 
         var existing = await _subjectRepository.GetByCodeAsync(dto.Code);
         if (existing != null && existing.Id != id)
         {
-            throw new InvalidOperationException($"Subject code '{dto.Code}' already exists");
+            throw new InvalidOperationException($"Mã môn học '{dto.Code}' đã tồn tại");
         }
 
         subject.Name = dto.Name;
@@ -77,7 +77,7 @@ public class SubjectService : ISubjectService
         var deleted = await _subjectRepository.DeleteAsync(id);
         if (!deleted)
         {
-            throw new KeyNotFoundException($"Subject with id '{id}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy môn học với id '{id}'");
         }
     }
 }

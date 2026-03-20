@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,6 +7,7 @@ using ExamSystem.DTOs;
 using ExamSystem.Models;
 using ExamSystem.Repositories.Interfaces;
 using ExamSystem.Services.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 
 namespace ExamSystem.Services;
@@ -17,17 +18,20 @@ public class UserService : IUserService
     private readonly IRoleRepository _roleRepository;
     private readonly IMapper _mapper;
     private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly IFileService _fileService;
 
     public UserService(
         IUserRepository userRepository,
         IRoleRepository roleRepository,
         IMapper mapper,
-        IPasswordHasher<User> passwordHasher)
+        IPasswordHasher<User> passwordHasher,
+        IFileService fileService)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
         _mapper = mapper;
         _passwordHasher = passwordHasher;
+        _fileService = fileService;
     }
 
     public async Task<UserDto?> GetByIdAsync(Guid id)
@@ -51,6 +55,7 @@ public class UserService : IUserService
             user.Username,
             user.Email,
             user.FullName,
+            user.Avatar,
             user.IsActive,
             user.CreatedAt,
             roles
@@ -70,15 +75,40 @@ public class UserService : IUserService
         return (_mapper.Map<List<UserDto>>(items), total, actualPage, actualPageSize);
     }
 
+    public async Task<(List<UserListItemDto> Items, int Total, int Page, int PageSize)> GetPagedWithRolesAsync(int? page, int? pageSize)
+    {
+        var total = await _userRepository.GetTotalCountAsync();
+
+        int actualPage = page ?? 1;
+        int actualPageSize = pageSize ?? 20;
+
+        if (actualPageSize <= 0) actualPageSize = 20;
+
+        var (items, _) = await _userRepository.GetPagedWithRolesAsync(actualPage, actualPageSize);
+
+        var dtos = items.Select(u => new UserListItemDto(
+            u.Id,
+            u.Username,
+            u.Email,
+            u.FullName,
+            u.Avatar,
+            u.IsActive,
+            u.CreatedAt,
+            u.UserRoles.Where(ur => ur.Role != null).Select(ur => ur.Role!.Name).ToList()
+        )).ToList();
+
+        return (dtos, total, actualPage, actualPageSize);
+    }
+
     public async Task<UserDto> CreateAsync(UserCreateDto dto)
     {
         // Check if username already exists
         if (await _userRepository.ExistsByUsernameAsync(dto.Username))
-            throw new InvalidOperationException($"Username '{dto.Username}' is already taken");
+            throw new InvalidOperationException($"Tên đăng nhập '{dto.Username}' đã được sử dụng");
 
         // Check if email already exists
         if (await _userRepository.ExistsByEmailAsync(dto.Email))
-            throw new InvalidOperationException($"Email '{dto.Email}' is already registered");
+            throw new InvalidOperationException($"Email '{dto.Email}' đã được đăng ký");
 
         var user = new User
         {
@@ -100,7 +130,7 @@ public class UserService : IUserService
     {
         var user = await _userRepository.GetByIdAsync(id);
         if (user == null)
-            throw new KeyNotFoundException($"User with id '{id}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy người dùng với id '{id}'");
 
         // Update only provided fields
         if (dto.Username != null)
@@ -108,7 +138,7 @@ public class UserService : IUserService
             // Check if new username is already taken by another user
             var existingUser = await _userRepository.GetByUsernameAsync(dto.Username);
             if (existingUser != null && existingUser.Id != id)
-                throw new InvalidOperationException($"Username '{dto.Username}' is already taken");
+                throw new InvalidOperationException($"Tên đăng nhập '{dto.Username}' đã được sử dụng");
 
             user.Username = dto.Username;
         }
@@ -118,7 +148,7 @@ public class UserService : IUserService
             // Check if new email is already registered by another user
             var existingUser = await _userRepository.GetByEmailAsync(dto.Email);
             if (existingUser != null && existingUser.Id != id)
-                throw new InvalidOperationException($"Email '{dto.Email}' is already registered");
+                throw new InvalidOperationException($"Email '{dto.Email}' đã được đăng ký");
 
             user.Email = dto.Email;
         }
@@ -137,7 +167,7 @@ public class UserService : IUserService
     {
         var user = await _userRepository.GetByIdAsync(id);
         if (user == null)
-            throw new KeyNotFoundException($"User with id '{id}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy người dùng với id '{id}'");
 
         await _userRepository.DeleteAsync(user);
     }
@@ -146,32 +176,60 @@ public class UserService : IUserService
     {
         var user = await _userRepository.GetByIdAsync(id);
         if (user == null)
-            throw new KeyNotFoundException($"User with id '{id}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy người dùng với id '{id}'");
 
         // Validate that all roles exist
         foreach (var roleId in dto.RoleIds)
         {
             var role = await _roleRepository.GetByIdAsync(roleId);
             if (role == null)
-                throw new KeyNotFoundException($"Role with id '{roleId}' not found");
+                throw new KeyNotFoundException($"Không tìm thấy vai trò với id '{roleId}'");
         }
 
         await _userRepository.AssignRolesAsync(id, dto.RoleIds);
+    }
+
+    public async Task<UserDto> ToggleLockAsync(Guid id)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null)
+            throw new KeyNotFoundException($"Người dùng với id '{id}' không tồn tại");
+
+        user.IsActive = !user.IsActive;
+        var updated = await _userRepository.UpdateAsync(user);
+        return _mapper.Map<UserDto>(updated);
     }
 
     public async Task ChangePasswordAsync(Guid id, UserChangePasswordDto dto)
     {
         var user = await _userRepository.GetByIdAsync(id);
         if (user == null)
-            throw new KeyNotFoundException($"User with id '{id}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy người dùng với id '{id}'");
 
         // Verify current password
         var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.CurrentPassword);
         if (result == PasswordVerificationResult.Failed)
-            throw new UnauthorizedAccessException("Current password is incorrect");
+            throw new UnauthorizedAccessException("Mật khẩu hiện tại không chính xác");
 
         // Hash and set new password
         user.PasswordHash = _passwordHasher.HashPassword(user, dto.NewPassword);
         await _userRepository.UpdateAsync(user);
+    }
+
+    public async Task<UserDto> UploadAvatarAsync(Guid id, IFormFile file)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null)
+            throw new KeyNotFoundException($"Không tìm thấy người dùng với id '{id}'");
+
+        // Xóa avatar cũ nếu có
+        _fileService.DeleteAvatar(user.Avatar);
+
+        // Lưu file mới
+        var fileName = await _fileService.SaveAvatarAsync(file);
+        user.Avatar = fileName;
+
+        var updated = await _userRepository.UpdateAsync(user);
+        return _mapper.Map<UserDto>(updated);
     }
 }

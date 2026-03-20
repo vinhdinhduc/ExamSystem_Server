@@ -3,14 +3,27 @@ using System.Collections.Generic;
 
 namespace ExamSystem.DTOs;
 
-// DTO để trả về thông tin User
+// DTO để trả về thông tin User (không kèm roles — dùng nội bộ)
 public record UserDto(
     Guid Id,
     string Username,
     string Email,
     string FullName,
+    string? Avatar,
     bool IsActive,
     DateTime CreatedAt
+);
+
+// DTO trả về danh sách users kèm roles — dùng cho trang Admin
+public record UserListItemDto(
+    Guid Id,
+    string Username,
+    string Email,
+    string FullName,
+    string? Avatar,
+    bool IsActive,
+    DateTime CreatedAt,
+    List<string> Roles
 );
 
 // DTO để tạo User mới
@@ -41,6 +54,7 @@ public record UserWithRolesDto(
     string Username,
     string Email,
     string FullName,
+    string? Avatar,
     bool IsActive,
     DateTime CreatedAt,
     List<RoleDto> Roles

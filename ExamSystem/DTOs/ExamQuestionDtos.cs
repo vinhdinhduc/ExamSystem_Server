@@ -10,10 +10,33 @@ public record ExamQuestionDto(
     int OrderIndex,
     decimal Score);
 
+public record ExamQuestionDetailOptionDto(
+    int Id,
+    string Content,
+    string? ImageUrl,
+    int OrderIndex);
+
+public record ExamQuestionDetailDto(
+    int ExamQuestionId,
+    Guid ExamId,
+    Guid QuestionId,
+    string Content,
+    string? ImageUrl,
+    byte QuestionType,
+    byte DifficultyLevel,
+    string? Tags,
+    string? Explanation,
+    int OrderIndex,
+    decimal Score,
+    List<ExamQuestionDetailOptionDto> Options);
+
 public record ExamQuestionCreateDto(
     Guid QuestionId,
-    int OrderIndex,
-    decimal Score);
+    int? OrderIndex,
+    decimal? Score);
+
+public record SyncExamQuestionsDto(
+    List<ExamQuestionCreateDto> Items);
 
 public record ExamQuestionUpdateDto(
     int OrderIndex,

@@ -1,6 +1,8 @@
 using System;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Asp.Versioning;
+using ExamSystem.Authorization;
 using ExamSystem.Common;
 using ExamSystem.DTOs;
 using ExamSystem.Services.Interfaces;
@@ -36,13 +38,97 @@ public class UsersController : ControllerBase
         _assignRolesValidator = assignRolesValidator;
     }
 
+    // ── Self-service endpoints (không cần permission — user tự quản lý profile) ──
+
+    [HttpGet("me")]
+    public async Task<IActionResult> GetMe()
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var user = await _userService.GetByIdAsync(userId.Value);
+        if (user == null) return NotFound();
+
+        return Ok(ApiResponse<UserDto>.Success(user, "Lấy thông tin cá nhân thành công"));
+    }
+
+    [HttpPut("me")]
+    public async Task<IActionResult> UpdateMe([FromBody] UserUpdateDto dto)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var validationResult = await _updateValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(ApiResponse<object>.Failure(
+                new ValidationError { Details = validationResult.Errors.Select(e => new ValidationDetail { Field = e.PropertyName, Message = e.ErrorMessage }).ToList() },
+                "Dữ liệu không hợp lệ",
+                400
+            ));
+        }
+
+        var user = await _userService.UpdateAsync(userId.Value, dto);
+        return Ok(ApiResponse<UserDto>.Success(user, "Cập nhật thông tin thành công"));
+    }
+
+    [HttpPost("me/avatar")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadMyAvatar(IFormFile file)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.Failure(null, "Vui lòng chọn file ảnh", 400));
+
+        try
+        {
+            var user = await _userService.UploadAvatarAsync(userId.Value, file);
+            return Ok(ApiResponse<object>.Success(new { avatar = user.Avatar }, "Upload avatar thành công"));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<object>.Failure(null, ex.Message, 400));
+        }
+    }
+
+    [HttpPost("me/change-password")]
+    public async Task<IActionResult> ChangeMyPassword([FromBody] UserChangePasswordDto dto)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var validationResult = await _changePasswordValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(ApiResponse<object>.Failure(
+                new ValidationError { Details = validationResult.Errors.Select(e => new ValidationDetail { Field = e.PropertyName, Message = e.ErrorMessage }).ToList() },
+                "Dữ liệu không hợp lệ",
+                400
+            ));
+        }
+
+        await _userService.ChangePasswordAsync(userId.Value, dto);
+        return Ok(ApiResponse<object?>.Success(null, "Đổi mật khẩu thành công"));
+    }
+
+    private Guid? GetCurrentUserId()
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(claim, out var id) ? id : null;
+    }
+
+    // ── Admin endpoints (cần permission) ───────────────────────────────────────
+
     [HttpGet]
+    [RequirePermission(Permissions.UserView)]
     public async Task<IActionResult> GetAll([FromQuery] int? page, [FromQuery] int? pageSize)
     {
-        var (items, total, actualPage, actualPageSize) = await _userService.GetPagedAsync(page, pageSize);
+        var (items, total, actualPage, actualPageSize) = await _userService.GetPagedWithRolesAsync(page, pageSize);
         var pages = (int)Math.Ceiling(total / (double)actualPageSize);
 
-        var paginatedResult = new PaginatedResult<UserDto>
+        var paginatedResult = new PaginatedResult<UserListItemDto>
         {
             Meta = new PaginationMeta
             {
@@ -54,51 +140,48 @@ public class UsersController : ControllerBase
             Result = items
         };
 
-        return Ok(ApiResponse<PaginatedResult<UserDto>>.Success(
+        return Ok(ApiResponse<PaginatedResult<UserListItemDto>>.Success(
             paginatedResult,
-            "Users retrieved successfully"
+            "Lấy danh sách người dùng thành công"
         ));
     }
 
     [HttpGet("{id:guid}")]
+    [RequirePermission(Permissions.UserView)]
     public async Task<IActionResult> GetById(Guid id)
     {
         var user = await _userService.GetByIdAsync(id);
         if (user == null)
         {
             return NotFound(ApiResponse<object>.Failure(
-                new NotFoundError { Resource = $"User with id '{id}'" },
-                "User not found",
+                new NotFoundError { Resource = $"Người dùng với id '{id}'" },
+                "Không tìm thấy người dùng",
                 404
             ));
         }
 
-        return Ok(ApiResponse<UserDto>.Success(
-            user,
-            "User retrieved successfully"
-        ));
+        return Ok(ApiResponse<UserDto>.Success(user, "Lấy thông tin người dùng thành công"));
     }
 
     [HttpGet("{id:guid}/roles")]
+    [RequirePermission(Permissions.UserView)]
     public async Task<IActionResult> GetWithRoles(Guid id)
     {
         var user = await _userService.GetByIdWithRolesAsync(id);
         if (user == null)
         {
             return NotFound(ApiResponse<object>.Failure(
-                new NotFoundError { Resource = $"User with id '{id}'" },
-                "User not found",
+                new NotFoundError { Resource = $"Người dùng với id '{id}'" },
+                "Không tìm thấy người dùng",
                 404
             ));
         }
 
-        return Ok(ApiResponse<UserWithRolesDto>.Success(
-            user,
-            "User with roles retrieved successfully"
-        ));
+        return Ok(ApiResponse<UserWithRolesDto>.Success(user, "Lấy người dùng kèm vai trò thành công"));
     }
 
     [HttpPost]
+    [RequirePermission(Permissions.UserCreate)]
     public async Task<IActionResult> Create([FromBody] UserCreateDto dto)
     {
         var validationResult = await _createValidator.ValidateAsync(dto);
@@ -106,7 +189,7 @@ public class UsersController : ControllerBase
         {
             return BadRequest(ApiResponse<object>.Failure(
                 new ValidationError { Details = validationResult.Errors.Select(e => new ValidationDetail { Field = e.PropertyName, Message = e.ErrorMessage }).ToList() },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -115,11 +198,12 @@ public class UsersController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = user.Id },
-            ApiResponse<UserDto>.Success(user, "User created successfully", 201)
+            ApiResponse<UserDto>.Success(user, "Tạo người dùng thành công", 201)
         );
     }
 
     [HttpPut("{id:guid}")]
+    [RequirePermission(Permissions.UserUpdate)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UserUpdateDto dto)
     {
         var validationResult = await _updateValidator.ValidateAsync(dto);
@@ -127,29 +211,25 @@ public class UsersController : ControllerBase
         {
             return BadRequest(ApiResponse<object>.Failure(
                 new ValidationError { Details = validationResult.Errors.Select(e => new ValidationDetail { Field = e.PropertyName, Message = e.ErrorMessage }).ToList() },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
 
         var user = await _userService.UpdateAsync(id, dto);
-        return Ok(ApiResponse<UserDto>.Success(
-            user,
-            "User updated successfully"
-        ));
+        return Ok(ApiResponse<UserDto>.Success(user, "Cập nhật người dùng thành công"));
     }
 
     [HttpDelete("{id:guid}")]
+    [RequirePermission(Permissions.UserDelete)]
     public async Task<IActionResult> Delete(Guid id)
     {
         await _userService.DeleteAsync(id);
-        return Ok(ApiResponse<object>.Success(
-            null,
-            "User deleted successfully"
-        ));
+        return Ok(ApiResponse<object?>.Success(null, "Xóa người dùng thành công"));
     }
 
     [HttpPost("{id:guid}/roles")]
+    [RequirePermission(Permissions.UserUpdate)]
     public async Task<IActionResult> AssignRoles(Guid id, [FromBody] AssignRolesToUserDto dto)
     {
         var validationResult = await _assignRolesValidator.ValidateAsync(dto);
@@ -157,19 +237,26 @@ public class UsersController : ControllerBase
         {
             return BadRequest(ApiResponse<object>.Failure(
                 new ValidationError { Details = validationResult.Errors.Select(e => new ValidationDetail { Field = e.PropertyName, Message = e.ErrorMessage }).ToList() },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
 
         await _userService.AssignRolesAsync(id, dto);
-        return Ok(ApiResponse<object>.Success(
-            null,
-            "Roles assigned to user successfully"
-        ));
+        return Ok(ApiResponse<object?>.Success(null, "Gán vai trò cho người dùng thành công"));
+    }
+
+    [HttpPatch("{id:guid}/toggle-lock")]
+    [RequirePermission(Permissions.UserUpdate)]
+    public async Task<IActionResult> ToggleLock(Guid id)
+    {
+        var user = await _userService.ToggleLockAsync(id);
+        var action = user.IsActive ? "mở khóa" : "khóa";
+        return Ok(ApiResponse<UserDto>.Success(user, $"Đã {action} tài khoản thành công"));
     }
 
     [HttpPost("{id:guid}/change-password")]
+    [RequirePermission(Permissions.UserUpdate)]
     public async Task<IActionResult> ChangePassword(Guid id, [FromBody] UserChangePasswordDto dto)
     {
         var validationResult = await _changePasswordValidator.ValidateAsync(dto);
@@ -177,15 +264,12 @@ public class UsersController : ControllerBase
         {
             return BadRequest(ApiResponse<object>.Failure(
                 new ValidationError { Details = validationResult.Errors.Select(e => new ValidationDetail { Field = e.PropertyName, Message = e.ErrorMessage }).ToList() },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
 
         await _userService.ChangePasswordAsync(id, dto);
-        return Ok(ApiResponse<object>.Success(
-            null,
-            "Password changed successfully"
-        ));
+        return Ok(ApiResponse<object?>.Success(null, "Đổi mật khẩu thành công"));
     }
 }

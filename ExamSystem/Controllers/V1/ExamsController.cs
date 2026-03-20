@@ -1,10 +1,11 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using ExamSystem.Common;
 using ExamSystem.DTOs;
 using ExamSystem.Services.Interfaces;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace ExamSystem.Controllers.V1;
 
@@ -60,7 +61,7 @@ public class ExamsController : ControllerBase
 
         return Ok(ApiResponse<PaginatedResult<ExamDto>>.Success(
             paginatedResult,
-            "Exams retrieved successfully"
+            "Lấy danh sách đề thi thành công"
         ));
     }
 
@@ -71,15 +72,15 @@ public class ExamsController : ControllerBase
         if (exam == null)
         {
             return NotFound(ApiResponse<object>.Failure(
-                new NotFoundError { Resource = $"Exam with id '{id}'" },
-                "Exam not found",
+                new NotFoundError { Resource = $"Đề thi với id '{id}'" },
+                "Không tìm thấy đề thi",
                 404
             ));
         }
 
         return Ok(ApiResponse<ExamDto>.Success(
             exam,
-            "Exam retrieved successfully"
+            "Lấy thông tin đề thi thành công"
         ));
     }
 
@@ -98,7 +99,7 @@ public class ExamsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -107,7 +108,7 @@ public class ExamsController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = exam.Id },
-            ApiResponse<ExamDto>.Success(exam, "Exam created successfully", 201)
+            ApiResponse<ExamDto>.Success(exam, "Tạo đề thi thành công", 201)
         );
     }
 
@@ -126,7 +127,7 @@ public class ExamsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -134,7 +135,7 @@ public class ExamsController : ControllerBase
         var exam = await _examService.UpdateAsync(id, dto);
         return Ok(ApiResponse<ExamDto>.Success(
             exam,
-            "Exam updated successfully"
+            "Cập nhật đề thi thành công"
         ));
     }
 
@@ -144,7 +145,7 @@ public class ExamsController : ControllerBase
         await _examService.DeleteAsync(id);
         return Ok(ApiResponse<object>.Success(
             null,
-            "Exam deleted successfully"
+            "Xóa đề thi thành công"
         ));
     }
 
@@ -154,7 +155,17 @@ public class ExamsController : ControllerBase
         var questions = await _examService.GetExamQuestionsAsync(id);
         return Ok(ApiResponse<List<ExamQuestionDto>>.Success(
             questions,
-            "Exam questions retrieved successfully"
+            "Lấy danh sách câu hỏi của đề thi thành công"
+        ));
+    }
+
+    [HttpGet("{id:guid}/questions/details")]
+    public async Task<IActionResult> GetQuestionDetails(Guid id)
+    {
+        var questions = await _examService.GetExamQuestionDetailsAsync(id);
+        return Ok(ApiResponse<List<ExamQuestionDetailDto>>.Success(
+            questions,
+            "Lấy chi tiết câu hỏi đề thi thành công"
         ));
     }
 
@@ -173,7 +184,7 @@ public class ExamsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -181,7 +192,32 @@ public class ExamsController : ControllerBase
         var examQuestion = await _examService.AddQuestionAsync(id, dto);
         return Ok(ApiResponse<ExamQuestionDto>.Success(
             examQuestion,
-            "Question added to exam successfully"
+            "Thêm câu hỏi vào đề thi thành công"
+        ));
+    }
+
+    [HttpPut("{id:guid}/questions/sync")]
+    public async Task<IActionResult> SyncQuestions(Guid id, [FromBody] SyncExamQuestionsDto dto)
+    {
+        if (dto.Items == null)
+        {
+            return BadRequest(ApiResponse<object>.Failure(
+                new ValidationError
+                {
+                    Details = new List<ValidationDetail>
+                    {
+                        new() { Field = "Items", Message = "Danh sách câu hỏi không hợp lệ" }
+                    }
+                },
+                "Dữ liệu không hợp lệ",
+                400
+            ));
+        }
+
+        await _examService.SyncExamQuestionsAsync(id, dto);
+        return Ok(ApiResponse<object>.Success(
+            null,
+            "Đồng bộ danh sách câu hỏi đề thi thành công"
         ));
     }
 
@@ -191,7 +227,7 @@ public class ExamsController : ControllerBase
         await _examService.RemoveQuestionAsync(id, examQuestionId);
         return Ok(ApiResponse<object>.Success(
             null,
-            "Question removed from exam successfully"
+            "Xóa câu hỏi khỏi đề thi thành công"
         ));
     }
 
@@ -210,7 +246,7 @@ public class ExamsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -218,7 +254,7 @@ public class ExamsController : ControllerBase
         await _examService.ReorderQuestionsAsync(id, dto);
         return Ok(ApiResponse<object>.Success(
             null,
-            "Exam questions reordered successfully"
+            "Sắp xếp lại câu hỏi đề thi thành công"
         ));
     }
 
@@ -237,7 +273,7 @@ public class ExamsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -245,7 +281,7 @@ public class ExamsController : ControllerBase
         await _examService.PublishAsync(id, dto);
         return Ok(ApiResponse<object>.Success(
             null,
-            "Exam published successfully"
+            "Công bố đề thi thành công"
         ));
     }
 
@@ -264,7 +300,7 @@ public class ExamsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -272,17 +308,27 @@ public class ExamsController : ControllerBase
         await _examService.AssignAsync(id, dto);
         return Ok(ApiResponse<object>.Success(
             null,
-            "Exam assigned successfully"
+            "Phân công đề thi thành công"
         ));
     }
 
-    [HttpGet("student/{userId:guid}/assigned")]
-    public async Task<IActionResult> GetStudentAssignedExams(Guid userId)
+    [HttpGet("assigned")]
+    public async Task<IActionResult> GetMyAssignedExams()
     {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(ApiResponse<object>.Failure(
+                new UnauthorizedError { Reason = "Không xác định được người dùng từ token" },
+                "Không xác định được người dùng từ token",
+                401
+            ));
+        }
+
         var exams = await _examService.GetStudentAssignedExamsAsync(userId);
         return Ok(ApiResponse<List<StudentAssignedExamDto>>.Success(
             exams,
-            "Assigned exams retrieved successfully"
+            "Lấy danh sách đề thi được giao thành công"
         ));
     }
 }

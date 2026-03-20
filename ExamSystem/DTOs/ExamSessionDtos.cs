@@ -49,3 +49,64 @@ public record SubmitExamResultDto(
     int TotalCorrect,
     DateTime SubmittedAt,
     byte Status);
+
+public record ExamSessionReviewDto(
+    Guid SessionId,
+    Guid ExamId,
+    Guid UserId,
+    string ExamTitle,
+    decimal Score,
+    bool IsPassed,
+    int TotalCorrect,
+    DateTime StartedAt,
+    DateTime SubmittedAt,
+    List<ExamSessionReviewQuestionDto> Questions);
+
+public record ExamSessionReviewQuestionDto(
+    Guid QuestionId,
+    string Content,
+    string? Explanation,
+    int OrderIndex,
+    decimal Score,
+    bool? IsCorrect,
+    List<int> SelectedAnswerIds,
+    List<int> CorrectAnswerIds,
+    List<ExamSessionReviewOptionDto> Options);
+
+public record ExamSessionReviewOptionDto(
+    int Id,
+    string Content,
+    string? ImageUrl,
+    int OrderIndex,
+    bool IsSelected,
+    bool? IsCorrect);
+
+public record StudentExamResultItemDto(
+    Guid SessionId,
+    Guid ExamId,
+    string ExamTitle,
+    decimal Score,
+    bool IsPassed,
+    int TotalCorrect,
+    DateTime SubmittedAt,
+    byte Status,
+    int AttemptNumber);
+
+public record TeacherAssignedStudentResultDto(
+    Guid UserId,
+    string FullName,
+    string Email,
+    bool IsSubmitted,
+    Guid? SessionId,
+    decimal? Score,
+    bool? IsPassed,
+    DateTime? SubmittedAt,
+    int Attempts);
+
+public record TeacherAssignedExamResultDto(
+    Guid ExamId,
+    string ExamTitle,
+    int TotalAssigned,
+    int TotalSubmitted,
+    int TotalNotSubmitted,
+    List<TeacherAssignedStudentResultDto> Students);

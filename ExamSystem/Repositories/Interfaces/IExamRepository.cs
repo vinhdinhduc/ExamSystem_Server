@@ -12,6 +12,7 @@ public interface IExamRepository
     Task<bool> DeleteAsync(Guid id);
 
     Task<List<ExamQuestion>> GetExamQuestionsAsync(Guid examId);
+    Task<List<ExamQuestion>> GetExamQuestionsWithDetailsAsync(Guid examId);
     Task<ExamQuestion?> GetExamQuestionByIdAsync(int examQuestionId);
     Task AddExamQuestionAsync(ExamQuestion examQuestion);
     Task RemoveExamQuestionAsync(ExamQuestion examQuestion);

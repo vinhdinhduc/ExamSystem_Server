@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Asp.Versioning;
+using ExamSystem.Authorization;
 using ExamSystem.Common;
 using ExamSystem.DTOs;
 using ExamSystem.Services.Interfaces;
@@ -31,6 +32,7 @@ public class PermissionsController : ControllerBase
     }
 
     [HttpGet]
+    [RequirePermission(Permissions.PermissionView)]
     public async Task<IActionResult> GetAll([FromQuery] int? page, [FromQuery] int? pageSize)
     {
         var (items, total, actualPage, actualPageSize) = await _permissionService.GetPagedAsync(page, pageSize);
@@ -50,47 +52,37 @@ public class PermissionsController : ControllerBase
 
         return Ok(ApiResponse<PaginatedResult<PermissionDto>>.Success(
             paginatedResult,
-            "Permissions retrieved successfully"
+            "Lấy danh sách quyền thành công"
         ));
     }
 
     [HttpGet("{id:guid}")]
+    [RequirePermission(Permissions.PermissionView)]
     public async Task<IActionResult> GetById(Guid id)
     {
         var permission = await _permissionService.GetByIdAsync(id);
         if (permission == null)
         {
             return NotFound(ApiResponse<object>.Failure(
-                new NotFoundError { Resource = $"Permission with id '{id}'" },
-                "Permission not found",
+                new NotFoundError { Resource = $"Quyền với id '{id}'" },
+                "Không tìm thấy quyền",
                 404
             ));
         }
 
-        return Ok(ApiResponse<PermissionDto>.Success(
-            permission,
-            "Permission retrieved successfully"
-        ));
+        return Ok(ApiResponse<PermissionDto>.Success(permission, "Lấy thông tin quyền thành công"));
     }
 
     [HttpPost]
+    [RequirePermission(Permissions.PermissionCreate)]
     public async Task<IActionResult> Create([FromBody] PermissionCreateDto dto)
     {
         var validationResult = await _createValidator.ValidateAsync(dto);
         if (!validationResult.IsValid)
         {
-            var validationError = new ValidationError
-            {
-                Details = validationResult.Errors.Select(e => new ValidationDetail
-                {
-                    Field = e.PropertyName,
-                    Message = e.ErrorMessage
-                }).ToList()
-            };
-
             return BadRequest(ApiResponse<object>.Failure(
-                validationError,
-                "Validation failed",
+                new ValidationError { Details = validationResult.Errors.Select(e => new ValidationDetail { Field = e.PropertyName, Message = e.ErrorMessage }).ToList() },
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -99,50 +91,33 @@ public class PermissionsController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = permission.Id },
-            ApiResponse<PermissionDto>.Success(
-                permission,
-                "Permission created successfully",
-                201
-            )
+            ApiResponse<PermissionDto>.Success(permission, "Tạo quyền thành công", 201)
         );
     }
 
     [HttpPut("{id:guid}")]
+    [RequirePermission(Permissions.PermissionUpdate)]
     public async Task<IActionResult> Update(Guid id, [FromBody] PermissionUpdateDto dto)
     {
         var validationResult = await _updateValidator.ValidateAsync(dto);
         if (!validationResult.IsValid)
         {
-            var validationError = new ValidationError
-            {
-                Details = validationResult.Errors.Select(e => new ValidationDetail
-                {
-                    Field = e.PropertyName,
-                    Message = e.ErrorMessage
-                }).ToList()
-            };
-
             return BadRequest(ApiResponse<object>.Failure(
-                validationError,
-                "Validation failed",
+                new ValidationError { Details = validationResult.Errors.Select(e => new ValidationDetail { Field = e.PropertyName, Message = e.ErrorMessage }).ToList() },
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
 
         var permission = await _permissionService.UpdateAsync(id, dto);
-        return Ok(ApiResponse<PermissionDto>.Success(
-            permission,
-            "Permission updated successfully"
-        ));
+        return Ok(ApiResponse<PermissionDto>.Success(permission, "Cập nhật quyền thành công"));
     }
 
     [HttpDelete("{id:guid}")]
+    [RequirePermission(Permissions.PermissionDelete)]
     public async Task<IActionResult> Delete(Guid id)
     {
         await _permissionService.DeleteAsync(id);
-        return Ok(ApiResponse<object>.Success(
-            null,
-            "Permission deleted successfully"
-        ));
+        return Ok(ApiResponse<object>.Success(null, "Xóa quyền thành công"));
     }
 }

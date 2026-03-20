@@ -5,7 +5,7 @@
 namespace ExamSystem.Migrations
 {
     /// <inheritdoc />
-    public partial class AddAuthenticationSystem : Migration
+    public partial class AddIsEmailVerified : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

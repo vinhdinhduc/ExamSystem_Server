@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoMapper;
@@ -45,7 +45,7 @@ public class PermissionService : IPermissionService
     public async Task<PermissionDto> CreateAsync(PermissionCreateDto dto)
     {
         if (await _permissionRepository.ExistsByCodeAsync(dto.Code))
-            throw new InvalidOperationException($"Permission with code '{dto.Code}' already exists");
+            throw new InvalidOperationException($"Mã quyền '{dto.Code}' đã tồn tại");
 
         var permission = _mapper.Map<Permission>(dto);
         var created = await _permissionRepository.CreateAsync(permission);
@@ -56,10 +56,10 @@ public class PermissionService : IPermissionService
     {
         var permission = await _permissionRepository.GetByIdAsync(id);
         if (permission == null)
-            throw new KeyNotFoundException($"Permission with id '{id}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy quyền với id '{id}'");
 
         if (await _permissionRepository.ExistsByCodeAsync(dto.Code, id))
-            throw new InvalidOperationException($"Permission with code '{dto.Code}' already exists");
+            throw new InvalidOperationException($"Mã quyền '{dto.Code}' đã tồn tại");
 
         permission.Code = dto.Code;
         permission.Description = dto.Description;
@@ -71,7 +71,7 @@ public class PermissionService : IPermissionService
     public async Task<bool> DeleteAsync(Guid id)
     {
         if (!await _permissionRepository.ExistsAsync(id))
-            throw new KeyNotFoundException($"Permission with id '{id}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy quyền với id '{id}'");
 
         return await _permissionRepository.DeleteAsync(id);
     }

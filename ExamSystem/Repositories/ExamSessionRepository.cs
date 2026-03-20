@@ -55,6 +55,16 @@ public class ExamSessionRepository : IExamSessionRepository
                 .ThenInclude(sa => sa.SessionAnswerDetails)
             .FirstOrDefaultAsync(s => s.Id == sessionId);
 
+    public Task<ExamSession?> GetSessionForReviewAsync(Guid sessionId)
+        => _context.ExamSessions
+            .Include(s => s.Exam)
+                .ThenInclude(e => e.ExamQuestions)
+                    .ThenInclude(eq => eq.Question)
+                        .ThenInclude(q => q.Answers)
+            .Include(s => s.SessionAnswers)
+                .ThenInclude(sa => sa.SessionAnswerDetails)
+            .FirstOrDefaultAsync(s => s.Id == sessionId);
+
     public Task<SessionAnswer?> GetSessionAnswerAsync(Guid sessionId, Guid questionId)
         => _context.SessionAnswers
             .Include(sa => sa.SessionAnswerDetails)

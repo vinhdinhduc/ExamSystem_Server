@@ -1,4 +1,4 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using ExamSystem.Common;
 using ExamSystem.DTOs;
 using ExamSystem.Services.Interfaces;
@@ -48,7 +48,7 @@ public class SubjectsController : ControllerBase
 
         return Ok(ApiResponse<PaginatedResult<SubjectDto>>.Success(
             paginatedResult,
-            "Subjects retrieved successfully"
+            "Lấy danh sách môn học thành công"
         ));
     }
 
@@ -59,15 +59,15 @@ public class SubjectsController : ControllerBase
         if (subject == null)
         {
             return NotFound(ApiResponse<object>.Failure(
-                new NotFoundError { Resource = $"Subject with id '{id}'" },
-                "Subject not found",
+                new NotFoundError { Resource = $"Môn học với id '{id}'" },
+                "Không tìm thấy môn học",
                 404
             ));
         }
 
         return Ok(ApiResponse<SubjectDto>.Success(
             subject,
-            "Subject retrieved successfully"
+            "Lấy thông tin môn học thành công"
         ));
     }
 
@@ -86,7 +86,7 @@ public class SubjectsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -95,7 +95,7 @@ public class SubjectsController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = subject.Id },
-            ApiResponse<SubjectDto>.Success(subject, "Subject created successfully", 201)
+            ApiResponse<SubjectDto>.Success(subject, "Tạo môn học thành công", 201)
         );
     }
 
@@ -114,7 +114,7 @@ public class SubjectsController : ControllerBase
                         Message = e.ErrorMessage
                     }).ToList()
                 },
-                "Validation failed",
+                "Dữ liệu không hợp lệ",
                 400
             ));
         }
@@ -122,7 +122,7 @@ public class SubjectsController : ControllerBase
         var subject = await _subjectService.UpdateAsync(id, dto);
         return Ok(ApiResponse<SubjectDto>.Success(
             subject,
-            "Subject updated successfully"
+            "Cập nhật môn học thành công"
         ));
     }
 
@@ -132,7 +132,7 @@ public class SubjectsController : ControllerBase
         await _subjectService.DeleteAsync(id);
         return Ok(ApiResponse<object>.Success(
             null,
-            "Subject deleted successfully"
+            "Xóa môn học thành công"
         ));
     }
 }

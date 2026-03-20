@@ -85,6 +85,14 @@ public class ExamRepository : IExamRepository
             .OrderBy(eq => eq.OrderIndex)
             .ToListAsync();
 
+    public Task<List<ExamQuestion>> GetExamQuestionsWithDetailsAsync(Guid examId)
+        => _context.ExamQuestions
+            .Include(eq => eq.Question)
+                .ThenInclude(q => q.Answers)
+            .Where(eq => eq.ExamId == examId)
+            .OrderBy(eq => eq.OrderIndex)
+            .ToListAsync();
+
     public Task<ExamQuestion?> GetExamQuestionByIdAsync(int examQuestionId)
         => _context.ExamQuestions.FirstOrDefaultAsync(eq => eq.Id == examQuestionId);
 

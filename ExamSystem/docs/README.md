@@ -1,23 +1,12 @@
-# 🎓 Online Exam System - Backend API Documentation
+# Online Exam System — Backend API
 
-> **ASP.NET Core Web API (.NET 10)** | Clean Architecture | Entity Framework Core
+> **ASP.NET Core Web API (.NET 10)** | Clean Architecture | Entity Framework Core | SQL Server
 
 **Base URL:** `http://localhost:5082/api/v1`
 
 ---
 
-## 📌 Tổng quan
-
-Hệ thống quản lý thi trực tuyến với kiến trúc Clean Architecture.
-
-**Tổng APIs đã hoàn thành: 24 APIs**
-- ✅ **Nhóm 1: Role & Permission** (12 APIs)
-- ✅ **Nhóm 2: User Management** (8 APIs)
-- ✅ **Nhóm 3: Authentication** (4 APIs)
-
----
-
-## 🚀 Công nghệ
+## Công nghệ sử dụng
 
 | Công nghệ | Phiên bản |
 |-----------|-----------|
@@ -27,772 +16,11 @@ Hệ thống quản lý thi trực tuyến với kiến trúc Clean Architecture
 | SQL Server | Latest |
 | AutoMapper | 12.0.1 |
 | FluentValidation | 11.12.0 |
-| Password Hashing | ASP.NET Core Identity |
+| Password Hashing | ASP.NET Core Identity PasswordHasher |
 
 ---
 
-## 📊 Database Schema
-
-### Roles
-```
-Id (Guid PK) - NEWSEQUENTIALID()
-Name (nvarchar(100), unique)
-Description (nvarchar(500), nullable)
-CreatedAt (datetime2)
-```
-
-### Permissions
-```
-Id (Guid PK) - NEWSEQUENTIALID()
-Code (nvarchar(100), unique)
-Description (nvarchar(500), nullable)
-```
-
-### RolePermissions
-```
-RoleId (Guid PK, FK → Roles)
-PermissionId (Guid PK, FK → Permissions)
-```
-
-### Users
-```
-Id (Guid PK) - NEWSEQUENTIALID()
-Username (nvarchar(50), unique)
-Email (nvarchar(100), unique)
-PasswordHash (nvarchar(500))
-FullName (nvarchar(100))
-IsActive (bit, default 1)
-CreatedAt (datetime2)
-```
-
-### UserRoles
-```
-UserId (Guid PK, FK → Users)
-RoleId (Guid PK, FK → Roles)
-```
-
-### RefreshTokens
-```
-Id (int PK, identity)
-UserId (Guid, FK → Users)
-Token (nvarchar(500))
-ExpiresAt (datetime2)
-IsRevoked (bit, default 0)
-CreatedAt (datetime2)
-```
-
----
-
-# 📡 NHÓM 1: ROLE & PERMISSION (12 APIs)
-
-## 1.1 GET All Roles
-
-**Method:** `GET`  
-**Endpoint:** `/api/v1/roles`  
-**Query Params:** `page` (optional), `pageSize` (optional)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Roles retrieved successfully",
-  "data": {
-    "meta": {
-      "page": 1,
-      "pageSize": 3,
-      "pages": 1,
-      "total": 3
-    },
-    "result": [
-      {
-        "id": "2164fb32-ab1e-f111-ad11-00090ffe0001",
-        "name": "Admin",
-        "description": "Administrator role",
-        "createdAt": "2024-01-20T10:00:00Z"
-      }
-    ]
-  }
-}
-```
-
----
-
-## 1.2 GET Role by ID
-
-**Method:** `GET`  
-**Endpoint:** `/api/v1/roles/{id}`  
-**Path Params:** `id` (Guid, required)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Role retrieved successfully",
-  "data": {
-    "id": "2164fb32-ab1e-f111-ad11-00090ffe0001",
-    "name": "Admin",
-    "description": "Administrator role",
-    "createdAt": "2024-01-20T10:00:00Z"
-  }
-}
-```
-
-**Response 404:**
-```json
-{
-  "statusCode": 404,
-  "error": {
-    "code": "NOT_FOUND",
-    "resource": "Role with id '...'"
-  },
-  "message": "Role not found",
-  "data": null
-}
-```
-
----
-
-## 1.3 GET Role with Permissions
-
-**Method:** `GET`  
-**Endpoint:** `/api/v1/roles/{id}/permissions`  
-**Path Params:** `id` (Guid, required)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Role with permissions retrieved successfully",
-  "data": {
-    "id": "2164fb32-ab1e-f111-ad11-00090ffe0001",
-    "name": "Admin",
-    "description": "Administrator role",
-    "createdAt": "2024-01-20T10:00:00Z",
-    "permissions": [
-      {
-        "id": "1164fb32-ab1e-f111-ad11-00090ffe0001",
-        "code": "USER_VIEW",
-        "description": "Xem danh sách người dùng"
-      }
-    ]
-  }
-}
-```
-
----
-
-## 1.4 CREATE Role
-
-**Method:** `POST`  
-**Endpoint:** `/api/v1/roles`
-
-**Request Body:**
-```json
-{
-  "name": "Manager",
-  "description": "Manager role"
-}
-```
-
-**Response 201:**
-```json
-{
-  "statusCode": 201,
-  "error": null,
-  "message": "Role created successfully",
-  "data": {
-    "id": "6fa85f64-5717-4562-b3fc-2c963f66afa9",
-    "name": "Manager",
-    "description": "Manager role",
-    "createdAt": "2024-01-20T11:00:00Z"
-  }
-}
-```
-
-**Response 400 - Validation:**
-```json
-{
-  "statusCode": 400,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "details": [
-      {
-        "field": "Name",
-        "message": "Name is required"
-      }
-    ]
-  },
-  "message": "Validation failed",
-  "data": null
-}
-```
-
-**Response 400 - Duplicate:**
-```json
-{
-  "statusCode": 400,
-  "error": {
-    "code": "BUSINESS_ERROR",
-    "reason": "Role with name 'Admin' already exists"
-  },
-  "message": "Role with name 'Admin' already exists",
-  "data": null
-}
-```
-
----
-
-## 1.5 UPDATE Role
-
-**Method:** `PUT`  
-**Endpoint:** `/api/v1/roles/{id}`  
-**Path Params:** `id` (Guid, required)
-
-**Request Body:**
-```json
-{
-  "name": "Senior Manager",
-  "description": "Updated description"
-}
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Role updated successfully",
-  "data": {
-    "id": "6fa85f64-5717-4562-b3fc-2c963f66afa9",
-    "name": "Senior Manager",
-    "description": "Updated description",
-    "createdAt": "2024-01-20T11:00:00Z"
-  }
-}
-```
-
----
-
-## 1.6 DELETE Role
-
-**Method:** `DELETE`  
-**Endpoint:** `/api/v1/roles/{id}`  
-**Path Params:** `id` (Guid, required)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Role deleted successfully",
-  "data": null
-}
-```
-
----
-
-## 1.7 ASSIGN Permissions to Role
-
-**Method:** `POST`  
-**Endpoint:** `/api/v1/roles/{id}/permissions`  
-**Path Params:** `id` (Guid, required)
-
-**Request Body:**
-```json
-{
-  "permissionIds": [
-    "1164fb32-ab1e-f111-ad11-00090ffe0001",
-    "2464fb32-ab1e-f111-ad11-00090ffe0001"
-  ]
-}
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Permissions assigned to role successfully",
-  "data": null
-}
-```
-
----
-
-## 1.8 GET All Permissions
-
-**Method:** `GET`  
-**Endpoint:** `/api/v1/permissions`  
-**Query Params:** `page` (optional), `pageSize` (optional)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Permissions retrieved successfully",
-  "data": {
-    "meta": {
-      "page": 1,
-      "pageSize": 33,
-      "pages": 1,
-      "total": 33
-    },
-    "result": [
-      {
-        "id": "1164fb32-ab1e-f111-ad11-00090ffe0001",
-        "code": "USER_VIEW",
-        "description": "Xem danh sách người dùng"
-      }
-    ]
-  }
-}
-```
-
----
-
-## 1.9 GET Permission by ID
-
-**Method:** `GET`  
-**Endpoint:** `/api/v1/permissions/{id}`  
-**Path Params:** `id` (Guid, required)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Permission retrieved successfully",
-  "data": {
-    "id": "1164fb32-ab1e-f111-ad11-00090ffe0001",
-    "code": "USER_VIEW",
-    "description": "Xem danh sách người dùng"
-  }
-}
-```
-
----
-
-## 1.10 CREATE Permission
-
-**Method:** `POST`  
-**Endpoint:** `/api/v1/permissions`
-
-**Request Body:**
-```json
-{
-  "code": "REPORT_VIEW",
-  "description": "Xem báo cáo"
-}
-```
-
-**Response 201:**
-```json
-{
-  "statusCode": 201,
-  "error": null,
-  "message": "Permission created successfully",
-  "data": {
-    "id": "7fa85f64-5717-4562-b3fc-2c963f66afaa",
-    "code": "REPORT_VIEW",
-    "description": "Xem báo cáo"
-  }
-}
-```
-
-**Response 400 - Validation:**
-```json
-{
-  "statusCode": 400,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "details": [
-      {
-        "field": "Code",
-        "message": "Code must be in UPPERCASE_WITH_UNDERSCORES format"
-      }
-    ]
-  },
-  "message": "Validation failed",
-  "data": null
-}
-```
-
----
-
-## 1.11 UPDATE Permission
-
-**Method:** `PUT`  
-**Endpoint:** `/api/v1/permissions/{id}`  
-**Path Params:** `id` (Guid, required)
-
-**Request Body:**
-```json
-{
-  "code": "REPORT_MANAGE",
-  "description": "Quản lý báo cáo"
-}
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Permission updated successfully",
-  "data": {
-    "id": "7fa85f64-5717-4562-b3fc-2c963f66afaa",
-    "code": "REPORT_MANAGE",
-    "description": "Quản lý báo cáo"
-  }
-}
-```
-
----
-
-## 1.12 DELETE Permission
-
-**Method:** `DELETE`  
-**Endpoint:** `/api/v1/permissions/{id}`  
-**Path Params:** `id` (Guid, required)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Permission deleted successfully",
-  "data": null
-}
-```
-
----
-
-# 📡 NHÓM 2: USER MANAGEMENT (8 APIs)
-
-## 2.1 GET All Users
-
-**Method:** `GET`  
-**Endpoint:** `/api/v1/users`  
-**Query Params:** `page` (optional), `pageSize` (optional)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Users retrieved successfully",
-  "data": {
-    "meta": {
-      "page": 1,
-      "pageSize": 10,
-      "pages": 1,
-      "total": 5
-    },
-    "result": [
-      {
-        "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
-        "username": "john_doe",
-        "email": "john@example.com",
-        "fullName": "John Doe",
-        "isActive": true,
-        "createdAt": "2024-01-20T12:00:00Z"
-      }
-    ]
-  }
-}
-```
-
-**⚠️ Lưu ý:** Response KHÔNG chứa `passwordHash`
-
----
-
-## 2.2 GET User by ID
-
-**Method:** `GET`  
-**Endpoint:** `/api/v1/users/{id}`  
-**Path Params:** `id` (Guid, required)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "User retrieved successfully",
-  "data": {
-    "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
-    "username": "john_doe",
-    "email": "john@example.com",
-    "fullName": "John Doe",
-    "isActive": true,
-    "createdAt": "2024-01-20T12:00:00Z"
-  }
-}
-```
-
----
-
-## 2.3 GET User with Roles
-
-**Method:** `GET`  
-**Endpoint:** `/api/v1/users/{id}/roles`  
-**Path Params:** `id` (Guid, required)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "User with roles retrieved successfully",
-  "data": {
-    "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
-    "username": "john_doe",
-    "email": "john@example.com",
-    "fullName": "John Doe",
-    "isActive": true,
-    "createdAt": "2024-01-20T12:00:00Z",
-    "roles": [
-      {
-        "id": "2264fb32-ab1e-f111-ad11-00090ffe0001",
-        "name": "Teacher",
-        "description": "Teacher role",
-        "createdAt": "2024-01-20T10:00:00Z"
-      }
-    ]
-  }
-}
-```
-
----
-
-## 2.4 CREATE User
-
-**Method:** `POST`  
-**Endpoint:** `/api/v1/users`
-
-**Request Body:**
-```json
-{
-  "username": "john_doe",
-  "email": "john@example.com",
-  "password": "SecurePass123",
-  "fullName": "John Doe"
-}
-```
-
-**Response 201:**
-```json
-{
-  "statusCode": 201,
-  "error": null,
-  "message": "User created successfully",
-  "data": {
-    "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
-    "username": "john_doe",
-    "email": "john@example.com",
-    "fullName": "John Doe",
-    "isActive": true,
-    "createdAt": "2024-01-20T12:00:00Z"
-  }
-}
-```
-
-**Response 400 - Duplicate Username:**
-```json
-{
-  "statusCode": 400,
-  "error": {
-    "code": "BUSINESS_ERROR",
-    "reason": "Username 'john_doe' is already taken"
-  },
-  "message": "Username 'john_doe' is already taken",
-  "data": null
-}
-```
-
----
-
-## 2.5 UPDATE User
-
-**Method:** `PUT`  
-**Endpoint:** `/api/v1/users/{id}`  
-**Path Params:** `id` (Guid, required)
-
-**Request Body:**
-```json
-{
-  "username": "john_doe_updated",
-  "email": "john_new@example.com",
-  "fullName": "John Doe Updated",
-  "isActive": false
-}
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "User updated successfully",
-  "data": {
-    "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
-    "username": "john_doe_updated",
-    "email": "john_new@example.com",
-    "fullName": "John Doe Updated",
-    "isActive": false,
-    "createdAt": "2024-01-20T12:00:00Z"
-  }
-}
-```
-
----
-
-## 2.6 DELETE User
-
-**Method:** `DELETE`  
-**Endpoint:** `/api/v1/users/{id}`  
-**Path Params:** `id` (Guid, required)
-
-**Request:**
-```
-Không có body
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "User deleted successfully",
-  "data": null
-}
-```
-
----
-
-## 2.7 ASSIGN Roles to User
-
-**Method:** `POST`  
-**Endpoint:** `/api/v1/users/{id}/roles`  
-**Path Params:** `id` (Guid, required)
-
-**Request Body:**
-```json
-{
-  "roleIds": [
-    "2264fb32-ab1e-f111-ad11-00090ffe0001",
-    "2164fb32-ab1e-f111-ad11-00090ffe0001"
-  ]
-}
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Roles assigned to user successfully",
-  "data": null
-}
-```
-
-**⚠️ Lưu ý:** THAY THẾ toàn bộ roles cũ
-
----
-
-## 2.8 CHANGE Password
-
-**Method:** `POST`  
-**Endpoint:** `/api/v1/users/{id}/change-password`  
-**Path Params:** `id` (Guid, required)
-
-**Request Body:**
-```json
-{
-  "currentPassword": "SecurePass123",
-  "newPassword": "NewSecurePass456"
-}
-```
-
-**Response 200:**
-```json
-{
-  "statusCode": 200,
-  "error": null,
-  "message": "Password changed successfully",
-  "data": null
-}
-```
-
-**Response 401 - Wrong Password:**
-```json
-{
-  "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Current password is incorrect"
-  },
-  "message": "Current password is incorrect",
-  "data": null
-}
-```
-
----
-
-## 🛠️ SETUP
+## Cài đặt & Chạy
 
 ```bash
 cd ExamSystem
@@ -801,29 +29,79 @@ dotnet ef database update
 dotnet run
 ```
 
-App: `http://localhost:5082`
+Ứng dụng chạy tại: `http://localhost:5082`
+Swagger UI: `http://localhost:5082/swagger`
+
+### Cấu hình Admin mặc định (`appsettings.json`)
+
+```json
+"AdminSettings": {
+  "Username": "admin",
+  "Email": "admin@example.com",
+  "FullName": "Super Admin",
+  "Password": "Admin@123"
+}
+```
+
+Khi khởi động lần đầu, hệ thống tự động seed:
+- 3 roles mặc định: `Admin`, `Teacher`, `Student`
+- 34 permissions theo nhóm chức năng
+- 1 tài khoản admin với full quyền (từ `AdminSettings`)
 
 ---
 
-## 📞 LIÊN HỆ
+## Kiến trúc hệ thống
 
-**GitHub:** [vinhdinhduc/ExamSystem_Server](https://github.com/vinhdinhduc/ExamSystem_Server)  
-**Branch:** `feature/auth`
-
-**Cập nhật:** 13/03/2026  
-**Phiên bản:** v2.0  
-**APIs:** 20/20 ✅
-
-### Nhóm 3: Authentication System (JWT)
+```
+Controllers/V1/          — Nhận request, trả response
+Services/                — Business logic
+Repositories/            — Truy vấn database
+DTOs/                    — Data Transfer Objects
+Models/                  — Entity models (EF Core)
+Authorization/           — Permission-based auth
+Middleware/              — Error handling, auth
+Data/                    — DbContext, DbSeeder
+Validators/              — FluentValidation rules
+Mappings/                — AutoMapper profiles
+```
 
 ---
 
-# 📡 NHÓM 3: AUTHENTICATION (4 APIs)
+## Xác thực & Phân quyền
 
-## 3.1 REGISTER (Đăng ký)
+### JWT Access Token
+- **Lifetime:** 15 phút
+- **Algorithm:** HMAC-SHA256
+- **Gửi qua:** `Authorization: Bearer {token}`
 
-**Method:** `POST`  
-**Endpoint:** `/api/v1/auth/register`
+### Refresh Token
+- **Lifetime:** 7 ngày
+- **Lưu trữ:** HttpOnly Cookie (`refresh_token`)
+- **Cơ chế:** Rotation — mỗi lần refresh, token cũ bị revoke, trả token mới
+
+### Permission-based Authorization
+Mỗi endpoint được bảo vệ bằng `[RequirePermission("CODE")]`.
+Hệ thống kiểm tra: `User → UserRoles → Role → RolePermissions → Permission.Code`
+
+---
+
+## Tổng quan APIs đã hoàn thành
+
+**Tổng: 25 APIs**
+
+| Nhóm | Số API | Trạng thái |
+|------|--------|-----------|
+| Authentication | 4 | ✅ |
+| User Management | 9 | ✅ |
+| Role & Permission | 12 | ✅ |
+
+---
+
+# NHÓM 1: AUTHENTICATION (4 APIs)
+
+## 1.1 Đăng ký
+
+**`POST /api/v1/auth/register`** — Không yêu cầu xác thực
 
 **Request Body:**
 ```json
@@ -842,7 +120,7 @@ App: `http://localhost:5082`
   "error": null,
   "message": "Đăng ký thành công",
   "data": {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "access_token": "eyJhbGci...",
     "expires_in": 900,
     "user": {
       "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
@@ -850,67 +128,21 @@ App: `http://localhost:5082`
       "email": "john@example.com",
       "fullName": "John Doe",
       "isActive": true,
-      "createdAt": "2024-01-20T12:00:00Z"
+      "createdAt": "2026-03-17T10:00:00Z"
     }
   }
 }
 ```
 
-**Set-Cookie Header:**
-```
-refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbg==...; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Expires=Sun, 27 Jan 2024 12:00:00 GMT
-```
+**Set-Cookie:** `refresh_token=...; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`
 
-**⚠️ Lưu ý:**
-- Access token trả về trong response body
-- Refresh token gửi qua HttpOnly Cookie (JavaScript KHÔNG thể đọc)
-- Cookie tự động được browser gửi kèm mỗi request đến `/api/v1/auth/*`
-
-**Response 400 - Duplicate Username:**
-```json
-{
-  "statusCode": 400,
-  "error": {
-    "code": "BUSINESS_ERROR",
-    "reason": "Tên đăng nhập 'john_doe' đã được sử dụng"
-  },
-  "message": "Tên đăng nhập 'john_doe' đã được sử dụng",
-  "data": null
-}
-```
-
-**Response 400 - Validation:**
-```json
-{
-  "statusCode": 400,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "details": [
-      {
-        "field": "Username",
-        "message": "Username is required"
-      },
-      {
-        "field": "Email",
-        "message": "Invalid email format"
-      },
-      {
-        "field": "Password",
-        "message": "Password must be at least 6 characters"
-      }
-    ]
-  },
-  "message": "Dữ liệu không hợp lệ",
-  "data": null
-}
-```
+> Sau khi đăng ký, tài khoản được tự động gán role `Student`.
 
 ---
 
-## 3.2 LOGIN (Đăng nhập)
+## 1.2 Đăng nhập
 
-**Method:** `POST`  
-**Endpoint:** `/api/v1/auth/login`
+**`POST /api/v1/auth/login`** — Không yêu cầu xác thực
 
 **Request Body:**
 ```json
@@ -920,7 +152,7 @@ refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbg==...; HttpOnly; Secure; SameSite=Strict
 }
 ```
 
-**⚠️ Lưu ý:** `usernameOrEmail` có thể là username HOẶC email
+> `usernameOrEmail` chấp nhận cả username lẫn email.
 
 **Response 200:**
 ```json
@@ -929,46 +161,28 @@ refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbg==...; HttpOnly; Secure; SameSite=Strict
   "error": null,
   "message": "Đăng nhập thành công",
   "data": {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "access_token": "eyJhbGci...",
     "expires_in": 900,
-    "user": {
-      "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
-      "username": "john_doe",
-      "email": "john@example.com",
-      "fullName": "John Doe",
-      "isActive": true,
-      "createdAt": "2024-01-20T12:00:00Z"
-    }
+    "user": { ... }
   }
 }
 ```
 
-**Set-Cookie Header:**
-```
-refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Expires=Sun, 27 Jan 2024 12:00:00 GMT
-```
-
-**Response 401 - Invalid Credentials:**
+**Response 401 — Sai mật khẩu:**
 ```json
 {
   "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Tên đăng nhập hoặc mật khẩu không đúng"
-  },
+  "error": { "code": "UNAUTHORIZED", "reason": "Tên đăng nhập hoặc mật khẩu không đúng" },
   "message": "Tên đăng nhập hoặc mật khẩu không đúng",
   "data": null
 }
 ```
 
-**Response 401 - Inactive Account:**
+**Response 401 — Tài khoản bị khóa:**
 ```json
 {
   "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Tài khoản đã bị khóa"
-  },
+  "error": { "code": "UNAUTHORIZED", "reason": "Tài khoản đã bị khóa" },
   "message": "Tài khoản đã bị khóa",
   "data": null
 }
@@ -976,20 +190,11 @@ refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA=; HttpOnly; Secure; SameSi
 
 ---
 
-## 3.3 REFRESH Token (Làm mới token)
+## 1.3 Làm mới token
 
-**Method:** `POST`  
-**Endpoint:** `/api/v1/auth/refresh`
+**`POST /api/v1/auth/refresh`** — Không yêu cầu xác thực (dùng cookie)
 
-**Request Body:**
-```
-KHÔNG CÓ BODY
-```
-
-**Cookie (tự động gửi bởi browser):**
-```
-refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA=
-```
+**Request:** Không có body. Cookie `refresh_token` được gửi tự động.
 
 **Response 200:**
 ```json
@@ -998,111 +203,22 @@ refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA=
   "error": null,
   "message": "Làm mới token thành công",
   "data": {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "access_token": "eyJhbGci...",
     "expires_in": 900,
-    "user": {
-      "id": "8fa85f64-5717-4562-b3fc-2c963f66afab",
-      "username": "john_doe",
-      "email": "john@example.com",
-      "fullName": "John Doe",
-      "isActive": true,
-      "createdAt": "2024-01-20T12:00:00Z"
-    }
+    "user": { ... }
   }
 }
 ```
 
-**Set-Cookie Header (NEW refresh token):**
-```
-refresh_token=bmV3cmVmcmVzaHRva2VuMTIzNDU2Nzg5MA==; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Expires=Sun, 27 Jan 2024 14:00:00 GMT
-```
-
-**⚠️ Lưu ý:** 
-- Refresh token cũ tự động bị revoke
-- Trả về access token MỚI + refresh token MỚI (qua cookie)
-- Client KHÔNG cần gửi refresh token trong body, cookie tự động gửi
-
-**Response 401 - Missing Cookie:**
-```json
-{
-  "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại"
-  },
-  "message": "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại",
-  "data": null
-}
-```
-
-**Response 401 - Invalid Token:**
-```json
-{
-  "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại"
-  },
-  "message": "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại",
-  "data": null
-}
-```
-
-**Response 401 - Revoked Token:**
-```json
-{
-  "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Phiên đăng nhập đã bị thu hồi"
-  },
-  "message": "Phiên đăng nhập đã bị thu hồi",
-  "data": null
-}
-```
-
-**Response 401 - Expired Token:**
-```json
-{
-  "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại"
-  },
-  "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại",
-  "data": null
-}
-```
-
-**Response 401 - Inactive User:**
-```json
-{
-  "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Tài khoản đã bị khóa"
-  },
-  "message": "Tài khoản đã bị khóa",
-  "data": null
-}
-```
+**Set-Cookie:** Refresh token mới được set. Token cũ bị revoke.
 
 ---
 
-## 3.4 LOGOUT (Đăng xuất)
+## 1.4 Đăng xuất
 
-**Method:** `POST`  
-**Endpoint:** `/api/v1/auth/logout`
+**`POST /api/v1/auth/logout`** — Yêu cầu xác thực
 
-**Request Body:**
-```
-KHÔNG CÓ BODY
-```
-
-**Cookie (tự động gửi bởi browser):**
-```
-refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA=
-```
+**Request:** Không có body.
 
 **Response 200:**
 ```json
@@ -1114,376 +230,478 @@ refresh_token=dGhpc2lzYXJlZnJlc2h0b2tlbjEyMzQ1Njc4OTA=
 }
 ```
 
-**Set-Cookie Header (xóa cookie):**
-```
-refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Expires=Thu, 01 Jan 1970 00:00:00 GMT
-```
-
-**⚠️ Lưu ý:**
-- Refresh token bị revoke trong database
-- Cookie tự động bị xóa
-- Client KHÔNG cần gửi refresh token trong body
+**Set-Cookie:** Cookie `refresh_token` bị xóa. Token bị revoke trong DB.
 
 ---
 
-## 🔐 Protected Endpoints (Yêu cầu xác thực)
+# NHÓM 2: USER MANAGEMENT (9 APIs)
 
-**TẤT CẢ endpoints sau đây yêu cầu Access Token:**
+> Tất cả endpoints yêu cầu `Authorization: Bearer {token}` và permission tương ứng.
 
-### Cách sử dụng Access Token
+## 2.1 Lấy danh sách users
 
-**Header:**
-```
-Authorization: Bearer {access_token}
-```
+**`GET /api/v1/users`** — Permission: `USER_VIEW`
+**Query Params:** `page` (optional), `pageSize` (optional, default 20)
 
-**Ví dụ:**
-```http
-GET /api/v1/users
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
----
-
-### Danh sách Endpoints được bảo vệ
-
-#### ✅ Roles (7 endpoints)
-- `GET /api/v1/roles` - Lấy danh sách roles
-- `GET /api/v1/roles/{id}` - Lấy role theo ID
-- `GET /api/v1/roles/{id}/permissions` - Lấy role kèm permissions
-- `POST /api/v1/roles` - Tạo role mới
-- `PUT /api/v1/roles/{id}` - Cập nhật role
-- `DELETE /api/v1/roles/{id}` - Xóa role
-- `POST /api/v1/roles/{id}/permissions` - Gán permissions
-
-#### ✅ Permissions (5 endpoints)
-- `GET /api/v1/permissions` - Lấy danh sách permissions
-- `GET /api/v1/permissions/{id}` - Lấy permission theo ID
-- `POST /api/v1/permissions` - Tạo permission mới
-- `PUT /api/v1/permissions/{id}` - Cập nhật permission
-- `DELETE /api/v1/permissions/{id}` - Xóa permission
-
-#### ✅ Users (8 endpoints)
-- `GET /api/v1/users` - Lấy danh sách users
-- `GET /api/v1/users/{id}` - Lấy user theo ID
-- `GET /api/v1/users/{id}/roles` - Lấy user kèm roles
-- `POST /api/v1/users` - Tạo user mới
-- `PUT /api/v1/users/{id}` - Cập nhật user
-- `DELETE /api/v1/users/{id}` - Xóa user
-- `POST /api/v1/users/{id}/roles` - Gán roles
-- `POST /api/v1/users/{id}/change-password` - Đổi password
-
----
-
-### Xử lý lỗi xác thực
-
-**401 - Chưa đăng nhập:**
-```http
-GET /api/v1/users
-(KHÔNG có Authorization header)
-```
-
-**Response:**
+**Response 200:**
 ```json
 {
-  "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
-  },
-  "message": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn",
-  "data": null
+  "statusCode": 200,
+  "error": null,
+  "message": "Lấy danh sách người dùng thành công",
+  "data": {
+    "meta": { "page": 1, "pageSize": 20, "pages": 1, "total": 5 },
+    "result": [
+      {
+        "id": "...",
+        "username": "john_doe",
+        "email": "john@example.com",
+        "fullName": "John Doe",
+        "isActive": true,
+        "createdAt": "2026-03-17T10:00:00Z",
+        "roles": ["Student"]
+      }
+    ]
+  }
 }
 ```
 
 ---
 
-**401 - Token hết hạn:**
-```http
-GET /api/v1/users
-Authorization: Bearer {expired_access_token}
-```
+## 2.2 Lấy user theo ID
 
-**Response:**
+**`GET /api/v1/users/{id}`** — Permission: `USER_VIEW`
+
+**Response 200:**
 ```json
 {
-  "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
-  },
-  "message": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn",
-  "data": null
-}
-```
-
-**Response Header:**
-```
-Token-Expired: true
-```
-
-**⚠️ Lưu ý:** Khi nhận `Token-Expired: true`, client nên:
-1. Gọi `POST /api/v1/auth/refresh` để lấy access token mới
-2. Retry request với access token mới
-3. Nếu refresh failed → redirect to login
-
----
-
-**401 - Token không hợp lệ:**
-```http
-GET /api/v1/users
-Authorization: Bearer invalid_token
-```
-
-**Response:**
-```json
-{
-  "statusCode": 401,
-  "error": {
-    "code": "UNAUTHORIZED",
-    "reason": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
-  },
-  "message": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn",
-  "data": null
+  "statusCode": 200,
+  "error": null,
+  "message": "Lấy thông tin người dùng thành công",
+  "data": { "id": "...", "username": "...", "email": "...", "fullName": "...", "isActive": true, "createdAt": "..." }
 }
 ```
 
 ---
 
-## 🔒 JWT Token Details
+## 2.3 Lấy user kèm roles
 
-### Access Token Claims
+**`GET /api/v1/users/{id}/roles`** — Permission: `USER_VIEW`
+
+**Response 200:**
 ```json
 {
-  "nameid": "8fa85f64-5717-4562-b3fc-2c963f66afab",
-  "unique_name": "john_doe",
+  "statusCode": 200,
+  "error": null,
+  "message": "Lấy người dùng kèm vai trò thành công",
+  "data": {
+    "id": "...",
+    "username": "john_doe",
+    "email": "john@example.com",
+    "fullName": "John Doe",
+    "isActive": true,
+    "createdAt": "...",
+    "roles": [
+      { "id": "...", "name": "Student", "description": "...", "createdAt": "..." }
+    ]
+  }
+}
+```
+
+---
+
+## 2.4 Tạo user
+
+**`POST /api/v1/users`** — Permission: `USER_CREATE`
+
+**Request Body:**
+```json
+{
+  "username": "john_doe",
   "email": "john@example.com",
-  "fullName": "John Doe",
-  "isActive": "True",
-  "nbf": 1705752000,
-  "exp": 1705755600,
-  "iat": 1705752000,
-  "iss": "ExamSystemAPI",
-  "aud": "ExamSystemClient"
+  "password": "SecurePass123",
+  "fullName": "John Doe"
 }
 ```
 
-### Token Configuration
-- **Access Token Lifetime:** 15 minutes (900 seconds)
-- **Refresh Token Lifetime:** 7 days
-- **Algorithm:** HMAC-SHA256
-- **Issuer:** ExamSystemAPI
-- **Audience:** ExamSystemClient
-
-### Cookie Configuration
-- **HttpOnly:** true (JavaScript không thể truy cập)
-- **Secure:** true (chỉ gửi qua HTTPS)
-- **SameSite:** Strict (ngăn CSRF)
-- **Path:** /api/v1/auth (chỉ gửi đến auth endpoints)
-- **Expires:** 7 days
+**Response 201:** Trả về `UserDto` của user vừa tạo.
 
 ---
 
-## 🔑 Security Features
+## 2.5 Cập nhật user
 
-### Password Security
-- ✅ ASP.NET Core Identity PasswordHasher
-- ✅ Bcrypt-like hashing algorithm
-- ✅ Salt generated per password
-- ✅ Never store plain text passwords
+**`PUT /api/v1/users/{id}`** — Permission: `USER_UPDATE`
 
-### Token Security
-- ✅ JWT signed with HMAC-SHA256
-- ✅ Refresh token: 64-byte random (Base64)
-- ✅ Token stored in database
-- ✅ Token revocation on logout
-- ✅ Expired token validation
-- ✅ One-time use refresh tokens
-
-### Best Practices
-- ✅ Short-lived access tokens (60 min)
-- ✅ Long-lived refresh tokens (7 days)
-- ✅ Refresh token rotation (old token revoked)
-- ✅ Account status validation (IsActive)
-- ✅ ClockSkew = 0 (no time tolerance)
-
----
-
-## 🧪 Testing Scenarios
-
-### Scenario 1: Register → Use Access Token
-
-**Step 1: Register**
-```http
-POST /api/v1/auth/register
-Content-Type: application/json
-
+**Request Body** (tất cả optional):
+```json
 {
-  "username": "test_user",
-  "email": "test@example.com",
-  "password": "Test123456",
-  "fullName": "Test User"
+  "username": "new_username",
+  "email": "new@example.com",
+  "fullName": "New Name",
+  "isActive": false
 }
 ```
 
-**Expected:** 
-- Status 201
-- Response body có `access_token` + `expires_in` + `user`
-- Set-Cookie header có `refresh_token`
+**Response 200:** Trả về `UserDto` đã cập nhật.
 
 ---
 
-**Step 2: Use Access Token**
-```http
-GET /api/v1/users
-Authorization: Bearer {access_token from step 1}
-```
+## 2.6 Xóa user
 
-**Expected:** 
-- Status 200
-- Danh sách users
+**`DELETE /api/v1/users/{id}`** — Permission: `USER_DELETE`
 
----
-
-### Scenario 2: Login → Access Protected → Refresh → Logout
-
-**Step 1: Login**
-```http
-POST /api/v1/auth/login
-Content-Type: application/json
-
+**Response 200:**
+```json
 {
-  "usernameOrEmail": "test_user",
-  "password": "Test123456"
+  "statusCode": 200,
+  "error": null,
+  "message": "Xóa người dùng thành công",
+  "data": null
 }
 ```
 
-**Expected:**
-- Status 200
-- Response body có `access_token`
-- Cookie `refresh_token` được set
-
 ---
 
-**Step 2: Access protected endpoint**
-```http
-GET /api/v1/roles
-Authorization: Bearer {access_token}
+## 2.7 Gán roles cho user
+
+**`POST /api/v1/users/{id}/roles`** — Permission: `USER_UPDATE`
+
+**Request Body:**
+```json
+{
+  "roleIds": ["guid-role-1", "guid-role-2"]
+}
 ```
 
-**Expected:**
-- Status 200
-- Danh sách roles
+> **Lưu ý:** THAY THẾ toàn bộ roles cũ bằng danh sách mới.
 
----
-
-**Step 3: Wait 15 minutes (hoặc test với token hết hạn)**
-```http
-GET /api/v1/roles
-Authorization: Bearer {expired_access_token}
+**Response 200:**
+```json
+{
+  "statusCode": 200,
+  "error": null,
+  "message": "Gán vai trò cho người dùng thành công",
+  "data": null
+}
 ```
 
-**Expected:**
-- Status 401
-- Header `Token-Expired: true`
-- Message: "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
-
 ---
 
-**Step 4: Refresh token**
-```http
-POST /api/v1/auth/refresh
-(Cookie tự động gửi refresh_token)
+## 2.8 Đổi mật khẩu
+
+**`POST /api/v1/users/{id}/change-password`** — Permission: `USER_UPDATE`
+
+**Request Body:**
+```json
+{
+  "currentPassword": "OldPass123",
+  "newPassword": "NewPass456"
+}
 ```
 
-**Expected:**
-- Status 200
-- Response body có `access_token` MỚI
-- Cookie `refresh_token` MỚI được set
-- Refresh token cũ bị revoke
-
----
-
-**Step 5: Use new access token**
-```http
-GET /api/v1/roles
-Authorization: Bearer {new_access_token}
+**Response 200:**
+```json
+{
+  "statusCode": 200,
+  "error": null,
+  "message": "Đổi mật khẩu thành công",
+  "data": null
+}
 ```
 
-**Expected:**
-- Status 200
-- Danh sách roles
-
 ---
 
-**Step 6: Logout**
-```http
-POST /api/v1/auth/logout
-(Cookie tự động gửi refresh_token)
+## 2.9 Khóa / Mở khóa tài khoản
+
+**`PATCH /api/v1/users/{id}/toggle-lock`** — Permission: `USER_UPDATE`
+
+**Request:** Không có body.
+
+**Response 200:**
+```json
+{
+  "statusCode": 200,
+  "error": null,
+  "message": "Đã khóa tài khoản thành công",
+  "data": { "id": "...", "username": "...", "isActive": false, ... }
+}
 ```
 
-**Expected:**
-- Status 200
-- Cookie `refresh_token` bị xóa
-- Refresh token bị revoke trong database
+> Message trả về "Đã khóa" hoặc "Đã mở khóa" tùy trạng thái sau khi toggle.
 
 ---
 
-**Step 7: Try to refresh with revoked token**
-```http
-POST /api/v1/auth/refresh
-(Cookie chứa revoked refresh_token)
+# NHÓM 3: ROLE & PERMISSION (12 APIs)
+
+> Tất cả endpoints yêu cầu `Authorization: Bearer {token}` và permission tương ứng.
+
+## 3.1 Lấy danh sách roles
+
+**`GET /api/v1/roles`** — Permission: `ROLE_VIEW`
+**Query Params:** `page`, `pageSize` (optional)
+
+**Response 200:**
+```json
+{
+  "statusCode": 200,
+  "error": null,
+  "message": "Lấy danh sách vai trò thành công",
+  "data": {
+    "meta": { "page": 1, "pageSize": 3, "pages": 1, "total": 3 },
+    "result": [
+      { "id": "...", "name": "Admin", "description": "...", "createdAt": "..." }
+    ]
+  }
+}
 ```
 
-**Expected:**
-- Status 401
-- Message: "Phiên đăng nhập đã bị thu hồi"
+---
+
+## 3.2 Lấy role theo ID
+
+**`GET /api/v1/roles/{id}`** — Permission: `ROLE_VIEW`
+
+**Response 200:** Trả về `RoleDto`.
 
 ---
 
-### Scenario 3: Access without token
+## 3.3 Lấy role kèm permissions
 
-**Without Token:**
-```http
-GET /api/v1/users
+**`GET /api/v1/roles/{id}/permissions`** — Permission: `ROLE_VIEW`
+
+**Response 200:**
+```json
+{
+  "statusCode": 200,
+  "error": null,
+  "message": "Lấy vai trò kèm quyền thành công",
+  "data": {
+    "id": "...",
+    "name": "Teacher",
+    "description": "...",
+    "createdAt": "...",
+    "permissions": [
+      { "id": "...", "code": "EXAM_VIEW", "description": "Xem danh sách bài thi" }
+    ]
+  }
+}
 ```
 
-**Expected:** 
-- Status 401
-- Message: "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
-
 ---
 
-**With Invalid Token:**
-```http
-GET /api/v1/users
-Authorization: Bearer invalid_token_here
+## 3.4 Tạo role
+
+**`POST /api/v1/roles`** — Permission: `ROLE_CREATE`
+
+**Request Body:**
+```json
+{
+  "name": "Moderator",
+  "description": "Vai trò kiểm duyệt"
+}
 ```
 
-**Expected:**
-- Status 401
-- Message: "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
+**Response 201:** Trả về `RoleDto` vừa tạo.
 
 ---
 
-## 🛠️ SETUP
+## 3.5 Cập nhật role
 
-```bash
-cd ExamSystem
-dotnet restore
-dotnet ef database update
-dotnet run
+**`PUT /api/v1/roles/{id}`** — Permission: `ROLE_UPDATE`
+
+**Request Body:**
+```json
+{
+  "name": "Senior Teacher",
+  "description": "Mô tả mới"
+}
 ```
 
-App: `http://localhost:5082`
+**Response 200:** Trả về `RoleDto` đã cập nhật.
 
 ---
 
-## 📞 LIÊN HỆ
+## 3.6 Xóa role
 
-**GitHub:** [vinhdinhduc/ExamSystem_Server](https://github.com/vinhdinhduc/ExamSystem_Server)  
-**Branch:** `feature/auth`
+**`DELETE /api/v1/roles/{id}`** — Permission: `ROLE_DELETE`
 
-**Cập nhật:** 13/03/2026  
-**Phiên bản:** v3.0  
-**APIs:** 24/24 ✅
+**Response 200:**
+```json
+{
+  "statusCode": 200,
+  "error": null,
+  "message": "Xóa vai trò thành công",
+  "data": null
+}
+```
+
+---
+
+## 3.7 Gán permissions cho role
+
+**`POST /api/v1/roles/{id}/permissions`** — Permission: `ROLE_ASSIGN_PERMISSION`
+
+**Request Body:**
+```json
+{
+  "permissionIds": ["guid-perm-1", "guid-perm-2"]
+}
+```
+
+> **Lưu ý:** THAY THẾ toàn bộ permissions cũ bằng danh sách mới.
+
+**Response 200:**
+```json
+{
+  "statusCode": 200,
+  "error": null,
+  "message": "Cập nhật quyền cho vai trò thành công",
+  "data": null
+}
+```
+
+---
+
+## 3.8 Lấy danh sách permissions
+
+**`GET /api/v1/permissions`** — Permission: `PERMISSION_VIEW`
+**Query Params:** `page`, `pageSize` (optional)
+
+**Response 200:**
+```json
+{
+  "statusCode": 200,
+  "error": null,
+  "message": "Lấy danh sách quyền thành công",
+  "data": {
+    "meta": { "page": 1, "pageSize": 34, "pages": 1, "total": 34 },
+    "result": [
+      { "id": "...", "code": "USER_VIEW", "description": "Xem danh sách người dùng" }
+    ]
+  }
+}
+```
+
+---
+
+## 3.9 Lấy permission theo ID
+
+**`GET /api/v1/permissions/{id}`** — Permission: `PERMISSION_VIEW`
+
+**Response 200:** Trả về `PermissionDto`.
+
+---
+
+## 3.10 Tạo permission
+
+**`POST /api/v1/permissions`** — Permission: `PERMISSION_CREATE`
+
+**Request Body:**
+```json
+{
+  "code": "REPORT_VIEW",
+  "description": "Xem báo cáo"
+}
+```
+
+> `code` phải theo định dạng `UPPER_SNAKE_CASE`.
+
+**Response 201:** Trả về `PermissionDto` vừa tạo.
+
+---
+
+## 3.11 Cập nhật permission
+
+**`PUT /api/v1/permissions/{id}`** — Permission: `PERMISSION_UPDATE`
+
+**Request Body:**
+```json
+{
+  "code": "REPORT_MANAGE",
+  "description": "Quản lý báo cáo"
+}
+```
+
+**Response 200:** Trả về `PermissionDto` đã cập nhật.
+
+---
+
+## 3.12 Xóa permission
+
+**`DELETE /api/v1/permissions/{id}`** — Permission: `PERMISSION_DELETE`
+
+**Response 200:**
+```json
+{
+  "statusCode": 200,
+  "error": null,
+  "message": "Xóa quyền thành công",
+  "data": null
+}
+```
+
+---
+
+# Danh sách Permissions mặc định (seed)
+
+| Nhóm | Permission Code |
+|------|----------------|
+| User | `USER_VIEW`, `USER_CREATE`, `USER_UPDATE`, `USER_DELETE` |
+| Role | `ROLE_VIEW`, `ROLE_CREATE`, `ROLE_UPDATE`, `ROLE_DELETE`, `ROLE_ASSIGN_PERMISSION` |
+| Permission | `PERMISSION_VIEW`, `PERMISSION_CREATE`, `PERMISSION_UPDATE`, `PERMISSION_DELETE` |
+| Exam | `EXAM_VIEW`, `EXAM_CREATE`, `EXAM_UPDATE`, `EXAM_DELETE`, `EXAM_PUBLISH`, `EXAM_ASSIGN` |
+| Question | `QUESTION_VIEW`, `QUESTION_CREATE`, `QUESTION_UPDATE`, `QUESTION_DELETE` |
+| Group | `GROUP_VIEW`, `GROUP_CREATE`, `GROUP_UPDATE`, `GROUP_DELETE`, `GROUP_MANAGE_MEMBER` |
+| Subject | `SUBJECT_VIEW`, `SUBJECT_CREATE`, `SUBJECT_UPDATE`, `SUBJECT_DELETE` |
+| Result | `RESULT_VIEW`, `RESULT_VIEW_ALL` |
+
+---
+
+# Xử lý lỗi chung
+
+**401 — Chưa đăng nhập / Token hết hạn:**
+```json
+{
+  "statusCode": 401,
+  "error": { "code": "UNAUTHORIZED", "reason": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn" },
+  "message": "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn",
+  "data": null
+}
+```
+
+**403 — Không có quyền:**
+```json
+{
+  "statusCode": 403,
+  "error": { "code": "FORBIDDEN", "reason": "Bạn không có quyền thực hiện thao tác này" },
+  "message": "Bạn không có quyền thực hiện thao tác này",
+  "data": null
+}
+```
+
+**400 — Validation:**
+```json
+{
+  "statusCode": 400,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "details": [{ "field": "Username", "message": "Username is required" }]
+  },
+  "message": "Dữ liệu không hợp lệ",
+  "data": null
+}
+```
+
+**404 — Không tìm thấy:**
+```json
+{
+  "statusCode": 404,
+  "error": { "code": "NOT_FOUND", "resource": "Người dùng với id '...'" },
+  "message": "Không tìm thấy người dùng",
+  "data": null
+}
+```
+
+---
+
+**Cập nhật:** 17/03/2026 | **Phiên bản:** v4.0 | **APIs:** 25/25 ✅

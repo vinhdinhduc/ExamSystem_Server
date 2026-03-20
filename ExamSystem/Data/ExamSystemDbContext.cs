@@ -27,6 +27,8 @@ public class ExamSystemDbContext : DbContext
     public DbSet<ExamSession> ExamSessions => Set<ExamSession>();
     public DbSet<SessionAnswer> SessionAnswers => Set<SessionAnswer>();
     public DbSet<SessionAnswerDetail> SessionAnswerDetails => Set<SessionAnswerDetail>();
+    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -175,6 +177,28 @@ public class ExamSystemDbContext : DbContext
                 .WithMany(e => e.SessionAnswerDetails)
                 .HasForeignKey(e => e.AnswerId)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<EmailVerificationToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Token).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.User)
+                .WithMany(e => e.EmailVerificationTokens)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PasswordResetToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Otp).IsRequired().HasMaxLength(6);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.User)
+                .WithMany(e => e.PasswordResetTokens)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

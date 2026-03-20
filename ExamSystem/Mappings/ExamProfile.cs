@@ -8,7 +8,8 @@ public class ExamProfile : Profile
 {
     public ExamProfile()
     {
-        CreateMap<Exam, ExamDto>();
+        CreateMap<Exam, ExamDto>()
+            .ForCtorParam("Questions", opt => opt.MapFrom(src => src.ExamQuestions));
         CreateMap<ExamCreateDto, Exam>();
         CreateMap<ExamQuestion, ExamQuestionDto>();
     }

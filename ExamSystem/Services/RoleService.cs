@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -68,7 +68,7 @@ public class RoleService : IRoleService
     public async Task<RoleDto> CreateAsync(RoleCreateDto dto)
     {
         if (await _roleRepository.ExistsByNameAsync(dto.Name))
-            throw new InvalidOperationException($"Role with name '{dto.Name}' already exists");
+            throw new InvalidOperationException($"Tên vai trò '{dto.Name}' đã tồn tại");
 
         var role = _mapper.Map<Role>(dto);
         role.CreatedAt = DateTime.UtcNow;
@@ -81,10 +81,10 @@ public class RoleService : IRoleService
     {
         var role = await _roleRepository.GetByIdAsync(id);
         if (role == null)
-            throw new KeyNotFoundException($"Role with id '{id}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy vai trò với id '{id}'");
 
         if (await _roleRepository.ExistsByNameAsync(dto.Name, id))
-            throw new InvalidOperationException($"Role with name '{dto.Name}' already exists");
+            throw new InvalidOperationException($"Tên vai trò '{dto.Name}' đã tồn tại");
 
         role.Name = dto.Name;
         role.Description = dto.Description;
@@ -96,7 +96,7 @@ public class RoleService : IRoleService
     public async Task<bool> DeleteAsync(Guid id)
     {
         if (!await _roleRepository.ExistsAsync(id))
-            throw new KeyNotFoundException($"Role with id '{id}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy vai trò với id '{id}'");
 
         return await _roleRepository.DeleteAsync(id);
     }
@@ -104,13 +104,13 @@ public class RoleService : IRoleService
     public async Task<bool> AssignPermissionsAsync(Guid roleId, AssignPermissionsToRoleDto dto)
     {
         if (!await _roleRepository.ExistsAsync(roleId))
-            throw new KeyNotFoundException($"Role with id '{roleId}' not found");
+            throw new KeyNotFoundException($"Không tìm thấy vai trò với id '{roleId}'");
 
         var existingPermissions = await _permissionRepository.GetByIdsAsync(dto.PermissionIds);
         if (existingPermissions.Count != dto.PermissionIds.Count)
         {
             var missingIds = dto.PermissionIds.Except(existingPermissions.Select(p => p.Id)).ToList();
-            throw new InvalidOperationException($"Some permissions not found: {string.Join(", ", missingIds)}");
+            throw new InvalidOperationException($"Không tìm thấy một số quyền: {string.Join(", ", missingIds)}");
         }
 
         return await _roleRepository.AssignPermissionsAsync(roleId, dto.PermissionIds);

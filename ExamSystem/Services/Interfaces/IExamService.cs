@@ -11,7 +11,9 @@ public interface IExamService
     Task DeleteAsync(Guid id);
 
     Task<List<ExamQuestionDto>> GetExamQuestionsAsync(Guid examId);
+    Task<List<ExamQuestionDetailDto>> GetExamQuestionDetailsAsync(Guid examId);
     Task<ExamQuestionDto> AddQuestionAsync(Guid examId, ExamQuestionCreateDto dto);
+    Task SyncExamQuestionsAsync(Guid examId, SyncExamQuestionsDto dto);
     Task RemoveQuestionAsync(Guid examId, int examQuestionId);
     Task ReorderQuestionsAsync(Guid examId, ReorderExamQuestionsDto dto);
 

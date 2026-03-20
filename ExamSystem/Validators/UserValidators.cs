@@ -1,4 +1,4 @@
-using ExamSystem.DTOs;
+﻿using ExamSystem.DTOs;
 using FluentValidation;
 
 namespace ExamSystem.Validators;
@@ -8,23 +8,22 @@ public class UserCreateDtoValidator : AbstractValidator<UserCreateDto>
     public UserCreateDtoValidator()
     {
         RuleFor(x => x.Username)
-            .NotEmpty().WithMessage("Username is required")
-            .MaximumLength(50).WithMessage("Username cannot exceed 50 characters")
-            .Matches("^[a-zA-Z0-9_]+$").WithMessage("Username can only contain letters, numbers, and underscores");
+            .NotEmpty().WithMessage("Tên đăng nhập không được để trống")
+            .MaximumLength(50).WithMessage("Tên đăng nhập không được vượt quá 50 ký tự");
 
         RuleFor(x => x.Email)
-            .NotEmpty().WithMessage("Email is required")
-            .EmailAddress().WithMessage("Invalid email format")
-            .MaximumLength(100).WithMessage("Email cannot exceed 100 characters");
+            .NotEmpty().WithMessage("Email không được để trống")
+            .EmailAddress().WithMessage("Email không hợp lệ")
+            .MaximumLength(100).WithMessage("Email không được vượt quá 100 ký tự");
 
         RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required")
-            .MinimumLength(6).WithMessage("Password must be at least 6 characters")
-            .MaximumLength(50).WithMessage("Password cannot exceed 50 characters");
+            .NotEmpty().WithMessage("Mật khẩu không được để trống")
+            .MinimumLength(6).WithMessage("Mật khẩu tối thiểu 6 ký tự")
+            .MaximumLength(50).WithMessage("Mật khẩu không được vượt quá 50 ký tự");
 
         RuleFor(x => x.FullName)
-            .NotEmpty().WithMessage("Full name is required")
-            .MaximumLength(100).WithMessage("Full name cannot exceed 100 characters");
+            .NotEmpty().WithMessage("Họ tên không được để trống")
+            .MaximumLength(100).WithMessage("Họ tên không được vượt quá 100 ký tự");
     }
 }
 
@@ -35,21 +34,20 @@ public class UserUpdateDtoValidator : AbstractValidator<UserUpdateDto>
         When(x => x.Username != null, () =>
         {
             RuleFor(x => x.Username)
-                .MaximumLength(50).WithMessage("Username cannot exceed 50 characters")
-                .Matches("^[a-zA-Z0-9_]+$").WithMessage("Username can only contain letters, numbers, and underscores");
+                .MaximumLength(50).WithMessage("Tên đăng nhập không được vượt quá 50 ký tự");
         });
 
         When(x => x.Email != null, () =>
         {
             RuleFor(x => x.Email)
-                .EmailAddress().WithMessage("Invalid email format")
-                .MaximumLength(100).WithMessage("Email cannot exceed 100 characters");
+                .EmailAddress().WithMessage("Email không hợp lệ")
+                .MaximumLength(100).WithMessage("Email không được vượt quá 100 ký tự");
         });
 
         When(x => x.FullName != null, () =>
         {
             RuleFor(x => x.FullName)
-                .MaximumLength(100).WithMessage("Full name cannot exceed 100 characters");
+                .MaximumLength(100).WithMessage("Họ tên không được vượt quá 100 ký tự");
         });
     }
 }
@@ -59,13 +57,13 @@ public class UserChangePasswordDtoValidator : AbstractValidator<UserChangePasswo
     public UserChangePasswordDtoValidator()
     {
         RuleFor(x => x.CurrentPassword)
-            .NotEmpty().WithMessage("Current password is required");
+            .NotEmpty().WithMessage("Mật khẩu hiện tại không được để trống");
 
         RuleFor(x => x.NewPassword)
-            .NotEmpty().WithMessage("New password is required")
-            .MinimumLength(6).WithMessage("New password must be at least 6 characters")
-            .MaximumLength(50).WithMessage("New password cannot exceed 50 characters")
-            .NotEqual(x => x.CurrentPassword).WithMessage("New password must be different from current password");
+            .NotEmpty().WithMessage("Mật khẩu mới không được để trống")
+            .MinimumLength(6).WithMessage("Mật khẩu mới tối thiểu 6 ký tự")
+            .MaximumLength(50).WithMessage("Mật khẩu mới không được vượt quá 50 ký tự")
+            .NotEqual(x => x.CurrentPassword).WithMessage("Mật khẩu mới phải khác mật khẩu hiện tại");
     }
 }
 
@@ -74,8 +72,9 @@ public class AssignRolesToUserDtoValidator : AbstractValidator<AssignRolesToUser
     public AssignRolesToUserDtoValidator()
     {
         RuleFor(x => x.RoleIds)
-            .NotEmpty().WithMessage("At least one role must be assigned")
+            .NotNull().WithMessage("Danh sách vai trò không được để trống")
             .Must(list => list.All(id => id != Guid.Empty))
-            .WithMessage("All role IDs must be valid GUIDs");
+            .WithMessage("Tất cả mã vai trò phải là GUID hợp lệ")
+            .When(x => x.RoleIds != null && x.RoleIds.Count > 0);
     }
 }
