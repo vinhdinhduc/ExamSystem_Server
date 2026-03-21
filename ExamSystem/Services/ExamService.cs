@@ -109,6 +109,7 @@ public class ExamService : IExamService
             eq.ExamId,
             eq.QuestionId,
             eq.Question.Content,
+            eq.Question.Answers.Any(a => a.IsCorrect),
             eq.Question.ImageUrl,
             eq.Question.QuestionType,
             eq.Question.DifficultyLevel,
@@ -122,7 +123,8 @@ public class ExamService : IExamService
                     a.Id,
                     a.Content,
                     a.ImageUrl,
-                    a.OrderIndex))
+                    a.OrderIndex,
+                    a.IsCorrect))
                 .ToList()
         )).ToList();
     }

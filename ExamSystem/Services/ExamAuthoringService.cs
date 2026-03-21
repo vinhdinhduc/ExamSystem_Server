@@ -105,6 +105,31 @@ public class ExamAuthoringService : IExamAuthoringService
         return new ExamAuthoringResultDto(examId, "file-import", draft.Questions.Count, draft);
     }
 
+    public async Task<ExamAuthoringResultDto> SaveDraftAsync(SaveExamDraftRequestDto dto)
+    {
+        await EnsureSubjectAndUserAsync(dto.SubjectId, dto.CreatedByUserId);
+
+        if (dto.Draft.Questions == null || dto.Draft.Questions.Count == 0)
+        {
+            throw new InvalidOperationException("Nháp đề thi phải có ít nhất 1 câu hỏi");
+        }
+
+        var normalizedQuestions = NormalizeQuestions(dto.Draft.Questions);
+
+        var normalizedDraft = dto.Draft with
+        {
+            Questions = normalizedQuestions
+        };
+
+        var examId = await SaveDraftAsExamAsync(dto.SubjectId, dto.CreatedByUserId, normalizedDraft);
+
+        return new ExamAuthoringResultDto(
+            examId,
+            string.IsNullOrWhiteSpace(dto.Source) ? "edited-draft" : dto.Source,
+            normalizedDraft.Questions.Count,
+            normalizedDraft);
+    }
+
     private async Task EnsureSubjectAndUserAsync(int subjectId, Guid createdByUserId)
     {
         var subjectExists = await _context.Subjects.AnyAsync(s => s.Id == subjectId);
@@ -400,9 +425,9 @@ public class ExamAuthoringService : IExamAuthoringService
             .ToDictionary(x => x.Key, x => x.First().Index, StringComparer.OrdinalIgnoreCase);
 
         var lineNumber = 1;
-        while (!reader.EndOfStream)
+        string? line;
+        while ((line = await reader.ReadLineAsync()) != null)
         {
-            var line = await reader.ReadLineAsync();
             lineNumber++;
             if (string.IsNullOrWhiteSpace(line))
             {

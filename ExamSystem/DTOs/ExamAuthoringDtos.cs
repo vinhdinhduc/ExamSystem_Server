@@ -81,3 +81,9 @@ public record ExamAuthoringResultDto(
     string Source,
     int TotalQuestions,
     ExamDraftDto Draft);
+
+public record SaveExamDraftRequestDto(
+    int SubjectId,
+    Guid CreatedByUserId,
+    ExamDraftDto Draft,
+    string Source = "edited-draft");

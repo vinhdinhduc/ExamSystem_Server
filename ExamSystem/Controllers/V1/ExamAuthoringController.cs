@@ -19,15 +19,18 @@ public class ExamAuthoringController : ControllerBase
     private readonly IExamAuthoringService _examAuthoringService;
     private readonly IValidator<GenerateExamWithGeminiRequestDto> _generateValidator;
     private readonly IValidator<ImportExamFromFileRequestDto> _importValidator;
+    private readonly IValidator<SaveExamDraftRequestDto> _saveDraftValidator;
 
     public ExamAuthoringController(
         IExamAuthoringService examAuthoringService,
         IValidator<GenerateExamWithGeminiRequestDto> generateValidator,
-        IValidator<ImportExamFromFileRequestDto> importValidator)
+        IValidator<ImportExamFromFileRequestDto> importValidator,
+        IValidator<SaveExamDraftRequestDto> saveDraftValidator)
     {
         _examAuthoringService = examAuthoringService;
         _generateValidator = generateValidator;
         _importValidator = importValidator;
+        _saveDraftValidator = saveDraftValidator;
     }
 
     [HttpPost("generate")]
@@ -104,5 +107,33 @@ public class ExamAuthoringController : ControllerBase
 
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv)).ToArray();
         return File(bytes, "text/csv; charset=utf-8", "exam-import-template.csv");
+    }
+
+    [HttpPost("save-draft")]
+    [RequirePermission(Permissions.ExamCreate)]
+    public async Task<IActionResult> SaveDraft([FromBody] SaveExamDraftRequestDto dto)
+    {
+        var validationResult = await _saveDraftValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(ApiResponse<object>.Failure(
+                new ValidationError
+                {
+                    Details = validationResult.Errors.Select(e => new ValidationDetail
+                    {
+                        Field = e.PropertyName,
+                        Message = e.ErrorMessage
+                    }).ToList()
+                },
+                "Dữ liệu không hợp lệ",
+                400
+            ));
+        }
+
+        var result = await _examAuthoringService.SaveDraftAsync(dto);
+        return Ok(ApiResponse<ExamAuthoringResultDto>.Success(
+            result,
+            "Lưu đề thi từ nháp đã chỉnh sửa thành công"
+        ));
     }
 }

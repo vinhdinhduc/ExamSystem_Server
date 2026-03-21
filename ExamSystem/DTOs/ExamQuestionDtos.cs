@@ -14,13 +14,15 @@ public record ExamQuestionDetailOptionDto(
     int Id,
     string Content,
     string? ImageUrl,
-    int OrderIndex);
+    int OrderIndex,
+    bool IsCorrect);
 
 public record ExamQuestionDetailDto(
     int ExamQuestionId,
     Guid ExamId,
     Guid QuestionId,
     string Content,
+    bool IsCorrect,
     string? ImageUrl,
     byte QuestionType,
     byte DifficultyLevel,

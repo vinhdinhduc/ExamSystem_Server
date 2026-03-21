@@ -230,7 +230,10 @@ public class ExamSessionService : IExamSessionService
             throw new KeyNotFoundException($"Không tìm thấy phiên thi với id '{sessionId}'");
         }
 
-        if (session.UserId != userId)
+        var isOwner = session.UserId == userId;
+        var isExamCreator = session.Exam.CreatedByUserId == userId;
+
+        if (!isOwner && !isExamCreator)
         {
             throw new UnauthorizedAccessException("Không thể xem kết quả phiên thi của người dùng khác");
         }
