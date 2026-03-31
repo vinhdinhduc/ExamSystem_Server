@@ -16,7 +16,10 @@ public record ExamSessionDto(
     int? TotalCorrect,
     int AttemptNumber,
     string? IpAddress,
-    string? QuestionOrder);
+    string? QuestionOrder,
+    int CurrentQuestionIndex,
+    int ViolationCount,
+    DateTime? LastSavedAt);
 
 public record StartExamRequestDto(
     Guid UserId,
@@ -39,8 +42,46 @@ public record AutoSaveAnswerDto(
     Guid QuestionId,
     List<int> AnswerIds);
 
+public record SaveExamProgressDto(
+    Guid UserId,
+    Guid QuestionId,
+    List<int> AnswerIds,
+    int CurrentQuestionIndex);
+
+public record SaveExamProgressRequestDto(
+    Guid SessionId,
+    Guid UserId,
+    Guid QuestionId,
+    List<int> AnswerIds,
+    int CurrentQuestionIndex);
+
+public record SaveExamProgressResultDto(
+    Guid SessionId,
+    int CurrentQuestionIndex,
+    int ViolationCount,
+    DateTime LastSavedAt,
+    byte Status,
+    bool IsAutoSubmitted);
+
 public record SubmitExamDto(
     Guid UserId);
+
+public record SubmitExamBySessionDto(
+    Guid SessionId,
+    Guid UserId);
+
+public record ExamViolationDto(
+    Guid SessionId,
+    Guid UserId,
+    string Type,
+    int? CurrentQuestionIndex = null);
+
+public record ExamViolationResultDto(
+    Guid SessionId,
+    int ViolationCount,
+    bool IsForceSubmitted,
+    byte Status,
+    DateTime? SubmittedAt);
 
 public record SubmitExamResultDto(
     Guid SessionId,
@@ -96,6 +137,7 @@ public record TeacherAssignedStudentResultDto(
     Guid UserId,
     string FullName,
     string Email,
+    string LearningStatus,
     bool IsSubmitted,
     Guid? SessionId,
     decimal? Score,

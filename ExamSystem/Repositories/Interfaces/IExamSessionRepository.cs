@@ -11,6 +11,7 @@ public interface IExamSessionRepository
     Task AddSessionAsync(ExamSession session);
     Task<ExamSession?> GetSessionByIdAsync(Guid sessionId);
     Task<ExamSession?> GetSessionForReviewAsync(Guid sessionId);
+    Task<List<ExamSession>> GetSessionsByExamAndUsersAsync(List<Guid> examIds, List<Guid> userIds);
     Task<SessionAnswer?> GetSessionAnswerAsync(Guid sessionId, Guid questionId);
     Task<List<SessionAnswer>> GetSessionAnswersWithDetailsAsync(Guid sessionId);
 

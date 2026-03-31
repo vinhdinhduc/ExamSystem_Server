@@ -65,6 +65,12 @@ public class ExamSessionRepository : IExamSessionRepository
                 .ThenInclude(sa => sa.SessionAnswerDetails)
             .FirstOrDefaultAsync(s => s.Id == sessionId);
 
+    public Task<List<ExamSession>> GetSessionsByExamAndUsersAsync(List<Guid> examIds, List<Guid> userIds)
+        => _context.ExamSessions
+            .AsNoTracking()
+            .Where(s => examIds.Contains(s.ExamId) && userIds.Contains(s.UserId))
+            .ToListAsync();
+
     public Task<SessionAnswer?> GetSessionAnswerAsync(Guid sessionId, Guid questionId)
         => _context.SessionAnswers
             .Include(sa => sa.SessionAnswerDetails)

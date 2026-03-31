@@ -18,6 +18,9 @@ public class ExamSession
     public int AttemptNumber { get; set; }
     public string? IpAddress { get; set; }
     public string? QuestionOrder { get; set; }
+    public int CurrentQuestionIndex { get; set; }
+    public int ViolationCount { get; set; }
+    public DateTime? LastSavedAt { get; set; }
 
     public Exam Exam { get; set; } = null!;
     public User User { get; set; } = null!;

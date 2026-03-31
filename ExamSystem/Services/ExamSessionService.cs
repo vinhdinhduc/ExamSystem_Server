@@ -3,22 +3,35 @@ using ExamSystem.Data;
 using ExamSystem.DTOs;
 using ExamSystem.Models;
 using ExamSystem.Repositories.Interfaces;
+using ExamSystem.Realtime;
 using ExamSystem.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 
 namespace ExamSystem.Services;
 
 public class ExamSessionService : IExamSessionService
 {
+    private const byte SessionStatusInProgress = 0;
+    private const byte SessionStatusSubmitted = 1;
+    private const byte SessionStatusTimedOut = 2;
+    private const byte SessionStatusForceSubmitted = 3;
+
     private readonly ExamSystemDbContext _context;
     private readonly IExamSessionRepository _examSessionRepository;
     private readonly ILogger<ExamSessionService> _logger;
+    private readonly IHubContext<ExamMonitoringHub> _hubContext;
 
-    public ExamSessionService(ExamSystemDbContext context, IExamSessionRepository examSessionRepository, ILogger<ExamSessionService> logger)
+    public ExamSessionService(
+        ExamSystemDbContext context,
+        IExamSessionRepository examSessionRepository,
+        ILogger<ExamSessionService> logger,
+        IHubContext<ExamMonitoringHub> hubContext)
     {
         _context = context;
         _examSessionRepository = examSessionRepository;
         _logger = logger;
+        _hubContext = hubContext;
     }
 
     public async Task<StartExamResponseDto> StartExamAsync(Guid examId, StartExamRequestDto dto, string? ipAddress)
@@ -88,10 +101,13 @@ public class ExamSessionService : IExamSessionService
             UserId = dto.UserId,
             StartedAt = now,
             ExpiresAt = now.AddMinutes(exam.Duration),
-            Status = 0,
+            Status = SessionStatusInProgress,
             AttemptNumber = attemptCount + 1,
             IpAddress = ipAddress,
-            QuestionOrder = JsonSerializer.Serialize(orderedQuestions.Select(q => q.QuestionId).ToList())
+            QuestionOrder = JsonSerializer.Serialize(orderedQuestions.Select(q => q.QuestionId).ToList()),
+            CurrentQuestionIndex = 0,
+            ViolationCount = 0,
+            LastSavedAt = now
         };
 
         var responseQuestions = new List<ExamSessionQuestionDto>();
@@ -139,51 +155,32 @@ public class ExamSessionService : IExamSessionService
 
     public async Task AutoSaveAnswerAsync(Guid sessionId, AutoSaveAnswerDto dto)
     {
-        var session = await _examSessionRepository.GetSessionByIdAsync(sessionId);
-        if (session == null)
-        {
-            throw new KeyNotFoundException($"Không tìm thấy phiên thi với id '{sessionId}'");
-        }
+        await SaveProgressCoreAsync(
+            sessionId,
+            dto.UserId,
+            dto.QuestionId,
+            dto.AnswerIds,
+            null,
+            emitRealtime: true);
+    }
 
-        if (session.UserId != dto.UserId)
-        {
-            throw new UnauthorizedAccessException("Không thể chỉnh sửa phiên thi của người dùng khác");
-        }
+    public async Task<SaveExamProgressResultDto> SaveProgressAsync(Guid sessionId, SaveExamProgressDto dto)
+    {
+        var result = await SaveProgressCoreAsync(
+            sessionId,
+            dto.UserId,
+            dto.QuestionId,
+            dto.AnswerIds,
+            dto.CurrentQuestionIndex,
+            emitRealtime: true);
 
-        if (session.Status != 0)
-        {
-            throw new InvalidOperationException("Phiên thi đã được nộp");
-        }
-
-        if (DateTime.UtcNow > session.ExpiresAt)
-        {
-            await GradeAndSubmitAsync(session, true);
-            throw new InvalidOperationException("Phiên thi đã hết giờ và được tự động nộp");
-        }
-
-        var sessionAnswer = session.SessionAnswers.FirstOrDefault(a => a.QuestionId == dto.QuestionId);
-        if (sessionAnswer == null)
-        {
-            throw new KeyNotFoundException("Câu hỏi không thuộc phiên thi này");
-        }
-
-        if (sessionAnswer.SessionAnswerDetails.Any())
-        {
-            await _examSessionRepository.RemoveSessionAnswerDetailsAsync(sessionAnswer.SessionAnswerDetails.ToList());
-        }
-
-        foreach (var answerId in dto.AnswerIds.Distinct())
-        {
-            await _examSessionRepository.AddSessionAnswerDetailAsync(new SessionAnswerDetail
-            {
-                SessionAnswerId = sessionAnswer.Id,
-                AnswerId = answerId,
-                SelectedAt = DateTime.UtcNow
-            });
-        }
-
-        sessionAnswer.AnsweredAt = DateTime.UtcNow;
-        await _examSessionRepository.SaveChangesAsync();
+        return new SaveExamProgressResultDto(
+            result.SessionId,
+            result.CurrentQuestionIndex,
+            result.ViolationCount,
+            result.LastSavedAt,
+            result.Status,
+            result.IsAutoSubmitted);
     }
 
     public async Task<SubmitExamResultDto> SubmitAsync(Guid sessionId, SubmitExamDto dto)
@@ -199,7 +196,7 @@ public class ExamSessionService : IExamSessionService
             throw new UnauthorizedAccessException("Không thể nộp bài cho phiên thi của người dùng khác");
         }
 
-        if (session.Status != 0)
+        if (session.Status != SessionStatusInProgress)
         {
             return new SubmitExamResultDto(
                 session.Id,
@@ -211,7 +208,7 @@ public class ExamSessionService : IExamSessionService
         }
 
         var timedOut = DateTime.UtcNow > session.ExpiresAt;
-        await GradeAndSubmitAsync(session, timedOut);
+        await GradeAndSubmitAsync(session, timedOut, false);
 
         return new SubmitExamResultDto(
             session.Id,
@@ -220,6 +217,72 @@ public class ExamSessionService : IExamSessionService
             session.TotalCorrect ?? 0,
             session.SubmittedAt ?? DateTime.UtcNow,
             session.Status);
+    }
+
+    public async Task<ExamViolationResultDto> ReportViolationAsync(ExamViolationDto dto)
+    {
+        var validTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "TAB_SWITCH",
+            "COPY",
+            "PASTE",
+            "EXIT_FULLSCREEN",
+            "DEVTOOLS"
+        };
+
+        if (!validTypes.Contains(dto.Type))
+        {
+            throw new InvalidOperationException("Loại vi phạm không hợp lệ");
+        }
+
+        var session = await _examSessionRepository.GetSessionByIdAsync(dto.SessionId);
+        if (session == null)
+        {
+            throw new KeyNotFoundException($"Không tìm thấy phiên thi với id '{dto.SessionId}'");
+        }
+
+        if (session.UserId != dto.UserId)
+        {
+            throw new UnauthorizedAccessException("Không thể báo vi phạm cho phiên thi của người dùng khác");
+        }
+
+        if (session.Status != SessionStatusInProgress)
+        {
+            return new ExamViolationResultDto(
+                session.Id,
+                session.ViolationCount,
+                session.Status == SessionStatusForceSubmitted,
+                session.Status,
+                session.SubmittedAt);
+        }
+
+        session.ViolationCount += 1;
+        if (dto.CurrentQuestionIndex.HasValue && dto.CurrentQuestionIndex.Value >= 0)
+        {
+            session.CurrentQuestionIndex = dto.CurrentQuestionIndex.Value;
+        }
+
+        var now = DateTime.UtcNow;
+        session.LastSavedAt = now;
+
+        var isForceSubmitted = session.ViolationCount >= 3;
+        if (isForceSubmitted)
+        {
+            await GradeAndSubmitAsync(session, timedOut: false, forced: true);
+        }
+        else
+        {
+            await _examSessionRepository.SaveChangesAsync();
+        }
+
+        await EmitStudentProgressAsync(session, "violation");
+
+        return new ExamViolationResultDto(
+            session.Id,
+            session.ViolationCount,
+            isForceSubmitted,
+            session.Status,
+            session.SubmittedAt);
     }
 
     public async Task<ExamSessionReviewDto> GetReviewAsync(Guid sessionId, Guid userId)
@@ -331,7 +394,7 @@ public class ExamSessionService : IExamSessionService
         }
 
         var exams = await examsQuery
-            .Select(e => new { e.Id, e.Title })
+            .Select(e => new { e.Id, e.Title, e.EndDate })
             .ToListAsync();
 
         if (exams.Count == 0)
@@ -392,10 +455,13 @@ public class ExamSessionService : IExamSessionService
                 .Where(u => allAssignedUserIds.Contains(u.Id))
                 .ToListAsync();
 
-        var submittedSessions = await _context.ExamSessions
-            .AsNoTracking()
-            .Where(s => examIds.Contains(s.ExamId) && allAssignedUserIds.Contains(s.UserId) && s.SubmittedAt.HasValue)
-            .ToListAsync();
+        var allSessions = allAssignedUserIds.Count == 0
+            ? new List<ExamSession>()
+            : await _examSessionRepository.GetSessionsByExamAndUsersAsync(examIds, allAssignedUserIds);
+
+        var submittedSessions = allSessions
+            .Where(s => s.SubmittedAt.HasValue)
+            .ToList();
 
         var result = new List<TeacherAssignedExamResultDto>();
 
@@ -415,16 +481,25 @@ public class ExamSessionService : IExamSessionService
                     .ThenByDescending(s => s.AttemptNumber)
                     .FirstOrDefault();
 
+                var latestAnySession = allSessions
+                    .Where(s => s.ExamId == exam.Id && s.UserId == uid)
+                    .OrderByDescending(s => s.StartedAt)
+                    .ThenByDescending(s => s.AttemptNumber)
+                    .FirstOrDefault();
+
+                var learningStatus = ResolveLearningStatus(latestAnySession, latestSession, exam.EndDate);
+
                 students.Add(new TeacherAssignedStudentResultDto(
                     user.Id,
                     user.FullName,
                     user.Email,
+                    learningStatus,
                     latestSession != null,
                     latestSession?.Id,
                     latestSession?.Score,
                     latestSession?.IsPassed,
                     latestSession?.SubmittedAt,
-                    submittedSessions.Count(s => s.ExamId == exam.Id && s.UserId == uid)
+                    allSessions.Count(s => s.ExamId == exam.Id && s.UserId == uid)
                 ));
             }
 
@@ -444,18 +519,100 @@ public class ExamSessionService : IExamSessionService
         return result;
     }
 
+    private async Task<(Guid SessionId, int CurrentQuestionIndex, int ViolationCount, DateTime LastSavedAt, byte Status, bool IsAutoSubmitted)> SaveProgressCoreAsync(
+        Guid sessionId,
+        Guid userId,
+        Guid questionId,
+        List<int> answerIds,
+        int? currentQuestionIndex,
+        bool emitRealtime)
+    {
+        var session = await _examSessionRepository.GetSessionByIdAsync(sessionId);
+        if (session == null)
+        {
+            throw new KeyNotFoundException($"Không tìm thấy phiên thi với id '{sessionId}'");
+        }
+
+        if (session.UserId != userId)
+        {
+            throw new UnauthorizedAccessException("Không thể chỉnh sửa phiên thi của người dùng khác");
+        }
+
+        if (session.Status != SessionStatusInProgress)
+        {
+            throw new InvalidOperationException("Phiên thi đã được nộp");
+        }
+
+        var now = DateTime.UtcNow;
+        if (now > session.ExpiresAt)
+        {
+            await GradeAndSubmitAsync(session, timedOut: true, forced: false);
+
+            return (
+                session.Id,
+                session.CurrentQuestionIndex,
+                session.ViolationCount,
+                session.LastSavedAt ?? now,
+                session.Status,
+                true);
+        }
+
+        var sessionAnswer = session.SessionAnswers.FirstOrDefault(a => a.QuestionId == questionId);
+        if (sessionAnswer == null)
+        {
+            throw new KeyNotFoundException("Câu hỏi không thuộc phiên thi này");
+        }
+
+        if (sessionAnswer.SessionAnswerDetails.Any())
+        {
+            await _examSessionRepository.RemoveSessionAnswerDetailsAsync(sessionAnswer.SessionAnswerDetails.ToList());
+        }
+
+        foreach (var answerId in answerIds.Distinct())
+        {
+            await _examSessionRepository.AddSessionAnswerDetailAsync(new SessionAnswerDetail
+            {
+                SessionAnswerId = sessionAnswer.Id,
+                AnswerId = answerId,
+                SelectedAt = now
+            });
+        }
+
+        if (currentQuestionIndex.HasValue && currentQuestionIndex.Value >= 0)
+        {
+            session.CurrentQuestionIndex = currentQuestionIndex.Value;
+        }
+
+        session.LastSavedAt = now;
+        sessionAnswer.AnsweredAt = now;
+        await _examSessionRepository.SaveChangesAsync();
+
+        if (emitRealtime)
+        {
+            await EmitStudentProgressAsync(session, "save_progress");
+        }
+
+        return (
+            session.Id,
+            session.CurrentQuestionIndex,
+            session.ViolationCount,
+            session.LastSavedAt ?? now,
+            session.Status,
+            false);
+    }
+
     public async Task<int> AutoSubmitExpiredSessionsAsync()
     {
         var sessions = await _examSessionRepository.GetExpiredActiveSessionsAsync(DateTime.UtcNow);
         foreach (var session in sessions)
         {
-            await GradeAndSubmitAsync(session, true);
+            await GradeAndSubmitAsync(session, timedOut: true, forced: false);
         }
 
         return sessions.Count;
     }
 
-    private async Task GradeAndSubmitAsync(ExamSession session, bool timedOut)
+    private async Task GradeAndSubmitAsync(ExamSession session, bool timedOut, bool forced)
     {
         var examQuestionScoreMap = session.Exam.ExamQuestions.ToDictionary(x => x.QuestionId, x => x.Score);
 
@@ -491,15 +648,20 @@ public class ExamSessionService : IExamSessionService
             }
         }
 
-        var percentScore = total > 0 ? Math.Round((achieved / total) * 100, 2) : 0;
+        var percentScore = total > 0 ? Math.Round((achieved / total) * 10, 2) : 0;
 
         session.SubmittedAt = DateTime.UtcNow;
         session.TotalCorrect = totalCorrect;
         session.Score = percentScore;
         session.IsPassed = percentScore >= session.Exam.PassScore;
-        session.Status = timedOut ? (byte)2 : (byte)1;
+        session.Status = forced
+            ? SessionStatusForceSubmitted
+            : timedOut
+                ? SessionStatusTimedOut
+                : SessionStatusSubmitted;
 
         await _examSessionRepository.SaveChangesAsync();
+        await EmitStudentSubmitAsync(session, forced ? "force_submitted" : timedOut ? "timed_out" : "submitted");
     }
 
     private static DateTime? NormalizeToUtc(DateTime? value)
@@ -523,6 +685,69 @@ public class ExamSessionService : IExamSessionService
         var unspecified = DateTime.SpecifyKind(dateTime, DateTimeKind.Unspecified);
         var timezone = ResolveVietnamTimeZone();
         return TimeZoneInfo.ConvertTimeToUtc(unspecified, timezone);
+    }
+
+    private async Task EmitStudentProgressAsync(ExamSession session, string action)
+    {
+        var remainingSeconds = (int)Math.Max(0, (session.ExpiresAt - DateTime.UtcNow).TotalSeconds);
+        var totalQuestions = session.SessionAnswers.Count;
+        var answeredQuestions = session.SessionAnswers.Count(sa => sa.SessionAnswerDetails.Any());
+        var progressPercent = totalQuestions == 0 ? 0 : Math.Round((double)answeredQuestions / totalQuestions * 100, 2);
+
+        var payload = new
+        {
+            sessionId = session.Id,
+            examId = session.ExamId,
+            userId = session.UserId,
+            action,
+            currentQuestionIndex = session.CurrentQuestionIndex,
+            violationCount = session.ViolationCount,
+            remainingSeconds,
+            progressPercent,
+            status = session.Status
+        };
+
+        await _hubContext.Clients.Group($"exam:{session.ExamId}").SendAsync("student_progress", payload);
+        await _hubContext.Clients.Group("exam-monitoring").SendAsync("student_progress", payload);
+    }
+
+    private async Task EmitStudentSubmitAsync(ExamSession session, string reason)
+    {
+        var payload = new
+        {
+            sessionId = session.Id,
+            examId = session.ExamId,
+            userId = session.UserId,
+            reason,
+            submittedAt = session.SubmittedAt,
+            score = session.Score,
+            isPassed = session.IsPassed,
+            status = session.Status
+        };
+
+        await _hubContext.Clients.Group($"exam:{session.ExamId}").SendAsync("student_submit", payload);
+        await _hubContext.Clients.Group("exam-monitoring").SendAsync("student_submit", payload);
+    }
+
+    private static string ResolveLearningStatus(ExamSession? latestAnySession, ExamSession? latestSubmittedSession, DateTime? examEndDate)
+    {
+        if (latestSubmittedSession != null)
+        {
+            return "DA_LAM";
+        }
+
+        if (latestAnySession is { Status: SessionStatusInProgress } && DateTime.UtcNow <= latestAnySession.ExpiresAt)
+        {
+            return "DANG_LAM";
+        }
+
+        var endUtc = NormalizeToUtc(examEndDate);
+        if (endUtc.HasValue && DateTime.UtcNow > endUtc.Value)
+        {
+            return "QUA_HAN";
+        }
+
+        return "CHUA_LAM";
     }
 
     private static TimeZoneInfo ResolveVietnamTimeZone()

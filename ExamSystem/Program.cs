@@ -5,6 +5,7 @@ using ExamSystem.Common;
 using ExamSystem.Data;
 using ExamSystem.Middleware;
 using ExamSystem.Models;
+using ExamSystem.Realtime;
 using ExamSystem.Repositories;
 using ExamSystem.Repositories.Interfaces;
 using ExamSystem.Services;
@@ -204,6 +205,7 @@ builder.Services.AddApiVersioning(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 builder.Services.AddOpenApi();
 
 // Cấu hình CORS để cho phép frontend truy cập API
@@ -260,5 +262,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ExamMonitoringHub>("/hubs/exam-monitoring");
 
 app.Run();
