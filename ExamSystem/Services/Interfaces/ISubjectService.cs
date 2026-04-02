@@ -8,5 +8,6 @@ public interface ISubjectService
     Task<SubjectDto?> GetByIdAsync(int id);
     Task<SubjectDto> CreateAsync(SubjectCreateDto dto);
     Task<SubjectDto> UpdateAsync(int id, SubjectUpdateDto dto);
+    Task<SubjectDto> ToggleActiveAsync(int id, bool isActive);
     Task DeleteAsync(int id);
 }

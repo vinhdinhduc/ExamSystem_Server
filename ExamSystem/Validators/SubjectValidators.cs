@@ -1,4 +1,4 @@
-﻿using ExamSystem.DTOs;
+using ExamSystem.DTOs;
 using FluentValidation;
 
 namespace ExamSystem.Validators;
@@ -38,5 +38,17 @@ public class SubjectUpdateDtoValidator : AbstractValidator<SubjectUpdateDto>
         RuleFor(x => x.Description)
             .MaximumLength(500).WithMessage("Mô tả không được vượt quá 500 ký tự")
             .When(x => !string.IsNullOrWhiteSpace(x.Description));
+    }
+}
+
+// Validator cho endpoint toggle trạng thái (bật/tắt) môn học
+public class SubjectToggleActiveDtoValidator : AbstractValidator<SubjectToggleActiveDto>
+{
+    public SubjectToggleActiveDtoValidator()
+    {
+        // IsActive không được để trống để tránh cập nhật sai dữ liệu
+        RuleFor(x => x.IsActive)
+            .NotNull()
+            .WithMessage("Trạng thái môn học không được để trống");
     }
 }

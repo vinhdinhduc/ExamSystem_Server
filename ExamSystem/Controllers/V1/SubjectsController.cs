@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using ExamSystem.Common;
 using ExamSystem.DTOs;
 using ExamSystem.Services.Interfaces;
@@ -17,15 +17,18 @@ public class SubjectsController : ControllerBase
     private readonly ISubjectService _subjectService;
     private readonly IValidator<SubjectCreateDto> _createValidator;
     private readonly IValidator<SubjectUpdateDto> _updateValidator;
+    private readonly IValidator<SubjectToggleActiveDto> _toggleActiveValidator;
 
     public SubjectsController(
         ISubjectService subjectService,
         IValidator<SubjectCreateDto> createValidator,
-        IValidator<SubjectUpdateDto> updateValidator)
+        IValidator<SubjectUpdateDto> updateValidator,
+        IValidator<SubjectToggleActiveDto> toggleActiveValidator)
     {
         _subjectService = subjectService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
+        _toggleActiveValidator = toggleActiveValidator;
     }
 
     [HttpGet]
@@ -133,6 +136,37 @@ public class SubjectsController : ControllerBase
         return Ok(ApiResponse<object>.Success(
             null,
             "Xóa môn học thành công"
+        ));
+    }
+
+    [HttpPatch("{id:int}/active")]
+    public async Task<IActionResult> ToggleActive(
+        int id,
+        [FromBody] SubjectToggleActiveDto dto)
+    {
+        // Validate body để đảm bảo isActive được cung cấp đầy đủ
+        var validationResult = await _toggleActiveValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(ApiResponse<object>.Failure(
+                new ValidationError
+                {
+                    Details = validationResult.Errors.Select(e => new ValidationDetail
+                    {
+                        Field = e.PropertyName,
+                        Message = e.ErrorMessage
+                    }).ToList()
+                },
+                "Dữ liệu không hợp lệ",
+                400
+            ));
+        }
+
+        // Cập nhật trạng thái môn học
+        var subject = await _subjectService.ToggleActiveAsync(id, dto.IsActive!.Value);
+        return Ok(ApiResponse<SubjectDto>.Success(
+            subject,
+            "Cập nhật trạng thái môn học thành công"
         ));
     }
 }

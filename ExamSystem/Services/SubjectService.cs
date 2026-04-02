@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using ExamSystem.DTOs;
 using ExamSystem.Models;
 using ExamSystem.Repositories.Interfaces;
@@ -79,5 +79,22 @@ public class SubjectService : ISubjectService
         {
             throw new KeyNotFoundException($"Không tìm thấy môn học với id '{id}'");
         }
+    }
+
+    public async Task<SubjectDto> ToggleActiveAsync(int id, bool isActive)
+    {
+        // Lấy môn học theo id để cập nhật trạng thái
+        var subject = await _subjectRepository.GetByIdAsync(id);
+        if (subject == null)
+        {
+            throw new KeyNotFoundException($"Không tìm thấy môn học với id '{id}'");
+        }
+
+        // Cập nhật trạng thái IsActive
+        subject.IsActive = isActive;
+
+        // Lưu thay đổi vào database thông qua repository
+        var updated = await _subjectRepository.UpdateAsync(subject);
+        return _mapper.Map<SubjectDto>(updated);
     }
 }

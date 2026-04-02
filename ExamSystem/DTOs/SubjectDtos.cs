@@ -27,3 +27,6 @@ public record SubjectFilterDto(
     bool? IsActive,
     int? Page,
     int? PageSize);
+
+// DTO dùng cho endpoint toggle trạng thái môn học
+public record SubjectToggleActiveDto(bool? IsActive);

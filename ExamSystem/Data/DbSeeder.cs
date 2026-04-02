@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using ExamSystem.Common;
 using ExamSystem.Models;
 using Microsoft.AspNetCore.Identity;
@@ -218,73 +218,177 @@ public static class DbSeeder
         User adminUser,
         DateTime now)
     {
-        if (await context.Subjects.AnyAsync(s => s.Code == "CSDL"))
+        // Nếu đã có đề thi mẫu thì không seed lại (để tránh trùng dữ liệu khi chạy lại)
+        if (await context.Exams.AnyAsync(e => e.AccessCode == "SQL2025"))
             return;
 
         var passwordHasher = new PasswordHasher<User>();
 
-        // Subjects
-        var subjects = new List<Subject>
+        // ── Subjects (seed idempotent theo Code) ───────────────────────────────
+        var subjectDefinitions = new List<Subject>
         {
             new() { Name = "Cơ sở dữ liệu", Code = "CSDL", Description = "Kiến thức SQL Server", IsActive = true, CreatedAt = now },
             new() { Name = "Lập trình Web", Code = "LTW", Description = "ASP.NET Core và Web API", IsActive = true, CreatedAt = now },
             new() { Name = "Cấu trúc dữ liệu", Code = "CTDL", Description = "Thuật toán và cấu trúc dữ liệu", IsActive = true, CreatedAt = now }
         };
-        await context.Subjects.AddRangeAsync(subjects);
-        await context.SaveChangesAsync();
 
-        var csdlSubject = subjects.First(s => s.Code == "CSDL");
-        var ltwSubject = subjects.First(s => s.Code == "LTW");
+        var subjectCodes = subjectDefinitions.Select(s => s.Code).ToList();
+        var existingSubjects = await context.Subjects
+            .Where(s => subjectCodes.Contains(s.Code))
+            .ToListAsync();
 
-        // Users
-        var teacher = new User
+        var subjectsByCode = existingSubjects.ToDictionary(s => s.Code, s => s);
+
+        var subjectsToAdd = subjectDefinitions
+            .Where(s => !subjectsByCode.ContainsKey(s.Code))
+            .ToList();
+
+        if (subjectsToAdd.Count > 0)
         {
-            Username = "teacher.demo",
-            Email = "teacher.demo@examsystem.local",
-            FullName = "Demo Teacher",
-            IsActive = true,
-            IsEmailVerified = true,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-        teacher.PasswordHash = passwordHasher.HashPassword(teacher, "Teacher@123");
+            await context.Subjects.AddRangeAsync(subjectsToAdd);
+            await context.SaveChangesAsync();
+        }
 
-        var student1 = new User
+        // Lấy lại để chắc chắn có Id đầy đủ cho phần seed phụ thuộc
+        existingSubjects = await context.Subjects
+            .Where(s => subjectCodes.Contains(s.Code))
+            .ToListAsync();
+        subjectsByCode = existingSubjects.ToDictionary(s => s.Code, s => s);
+
+        var csdlSubject = subjectsByCode["CSDL"];
+        var ltwSubject = subjectsByCode["LTW"];
+
+        // ── Users (seed idempotent theo Email) ────────────────────────────────
+        var teacherEmail = "teacher.demo@examsystem.local";
+        var student1Email = "student.one@examsystem.local";
+        var student2Email = "student.two@examsystem.local";
+
+        // Chuẩn hóa email về lowercase để so sánh không phụ thuộc hoa/thường
+        var teacherEmailNormalized = teacherEmail.ToLowerInvariant();
+        var student1EmailNormalized = student1Email.ToLowerInvariant();
+        var student2EmailNormalized = student2Email.ToLowerInvariant();
+
+        var userEmails = new List<string> { teacherEmail, student1Email, student2Email };
+        var normalizedUserEmails = new List<string>
+            { teacherEmailNormalized, student1EmailNormalized, student2EmailNormalized };
+
+        var existingUsers = await context.Users
+            .Where(u => normalizedUserEmails.Contains(u.Email.ToLower()))
+            .ToListAsync();
+
+        // Lưu theo key đã normalize để tra cứu nhanh/đúng
+        var usersByEmail = existingUsers.ToDictionary(u => u.Email.ToLower(), u => u);
+
+        var usersToAdd = new List<User>();
+
+        // Teacher
+        if (!usersByEmail.ContainsKey(teacherEmailNormalized))
         {
-            Username = "student.one",
-            Email = "student.one@examsystem.local",
-            FullName = "Student One",
-            IsActive = true,
-            IsEmailVerified = true,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-        student1.PasswordHash = passwordHasher.HashPassword(student1, "Student@123");
+            var teacherToAdd = new User
+            {
+                Username = "teacher.demo",
+                Email = teacherEmail,
+                FullName = "Demo Teacher",
+                IsActive = true,
+                IsEmailVerified = true,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            teacherToAdd.PasswordHash = passwordHasher.HashPassword(teacherToAdd, "Teacher@123");
+            usersToAdd.Add(teacherToAdd);
+        }
 
-        var student2 = new User
+        // Student 1
+        if (!usersByEmail.ContainsKey(student1EmailNormalized))
         {
-            Username = "student.two",
-            Email = "student.two@examsystem.local",
-            FullName = "Student Two",
-            IsActive = true,
-            IsEmailVerified = true,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-        student2.PasswordHash = passwordHasher.HashPassword(student2, "Student@123");
+            var student1ToAdd = new User
+            {
+                Username = "student.one",
+                Email = student1Email,
+                FullName = "Student One",
+                IsActive = true,
+                IsEmailVerified = true,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            student1ToAdd.PasswordHash = passwordHasher.HashPassword(student1ToAdd, "Student@123");
+            usersToAdd.Add(student1ToAdd);
+        }
 
-        await context.Users.AddRangeAsync(teacher, student1, student2);
-        await context.SaveChangesAsync();
-
-        // User roles
-        var userRoles = new List<UserRole>
+        // Student 2
+        if (!usersByEmail.ContainsKey(student2EmailNormalized))
         {
-            new() { UserId = teacher.Id, RoleId = roles["Teacher"].Id, AssignedAt = now },
-            new() { UserId = student1.Id, RoleId = roles["Student"].Id, AssignedAt = now },
-            new() { UserId = student2.Id, RoleId = roles["Student"].Id, AssignedAt = now }
-        };
-        await context.UserRoles.AddRangeAsync(userRoles);
-        await context.SaveChangesAsync();
+            var student2ToAdd = new User
+            {
+                Username = "student.two",
+                Email = student2Email,
+                FullName = "Student Two",
+                IsActive = true,
+                IsEmailVerified = true,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            student2ToAdd.PasswordHash = passwordHasher.HashPassword(student2ToAdd, "Student@123");
+            usersToAdd.Add(student2ToAdd);
+        }
+
+        if (usersToAdd.Count > 0)
+        {
+            await context.Users.AddRangeAsync(usersToAdd);
+            await context.SaveChangesAsync();
+        }
+
+        // Lấy lại để dùng Id chính xác cho phần seed tiếp theo
+        existingUsers = await context.Users
+            .Where(u => normalizedUserEmails.Contains(u.Email.ToLower()))
+            .ToListAsync();
+        usersByEmail = existingUsers.ToDictionary(u => u.Email.ToLower(), u => u);
+
+        var teacher = usersByEmail[teacherEmailNormalized];
+        var student1 = usersByEmail[student1EmailNormalized];
+        var student2 = usersByEmail[student2EmailNormalized];
+
+        // ── User roles (seed idempotent theo (UserId, RoleId)) ─────────────
+        var teacherRoleId = roles["Teacher"].Id;
+        var studentRoleId = roles["Student"].Id;
+
+        var userRolesToAdd = new List<UserRole>();
+
+        if (!await context.UserRoles.AnyAsync(ur => ur.UserId == teacher.Id && ur.RoleId == teacherRoleId))
+        {
+            userRolesToAdd.Add(new UserRole
+            {
+                UserId = teacher.Id,
+                RoleId = teacherRoleId,
+                AssignedAt = now
+            });
+        }
+
+        if (!await context.UserRoles.AnyAsync(ur => ur.UserId == student1.Id && ur.RoleId == studentRoleId))
+        {
+            userRolesToAdd.Add(new UserRole
+            {
+                UserId = student1.Id,
+                RoleId = studentRoleId,
+                AssignedAt = now
+            });
+        }
+
+        if (!await context.UserRoles.AnyAsync(ur => ur.UserId == student2.Id && ur.RoleId == studentRoleId))
+        {
+            userRolesToAdd.Add(new UserRole
+            {
+                UserId = student2.Id,
+                RoleId = studentRoleId,
+                AssignedAt = now
+            });
+        }
+
+        if (userRolesToAdd.Count > 0)
+        {
+            await context.UserRoles.AddRangeAsync(userRolesToAdd);
+            await context.SaveChangesAsync();
+        }
 
         // Questions + Answers
         var q1 = new Question
