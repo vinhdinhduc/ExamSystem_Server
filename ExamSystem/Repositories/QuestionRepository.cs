@@ -32,6 +32,7 @@ public class QuestionRepository : IQuestionRepository
         }
 
         return query
+            .Include(q => q.Answers)
             .OrderByDescending(q => q.CreatedAt)
             .ToListAsync();
     }

@@ -15,7 +15,8 @@ public record QuestionDto(
     string? Explanation,
     bool IsActive,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    IReadOnlyList<AnswerDto> Answers);
 
 public record QuestionOptionCreateDto(
     string Content,

@@ -8,6 +8,7 @@ public class QuestionProfile : Profile
 {
     public QuestionProfile()
     {
-        CreateMap<Question, QuestionDto>();
+        // ConvertUsing: tránh lỗi map record + Answers khi có code gọi Map<List<QuestionDto>>(questions)
+        CreateMap<Question, QuestionDto>().ConvertUsing((Question q) => QuestionEntityMapper.ToDto(q));
     }
 }

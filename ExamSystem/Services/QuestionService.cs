@@ -1,5 +1,5 @@
-﻿using AutoMapper;
 using ExamSystem.DTOs;
+using ExamSystem.Mappings;
 using ExamSystem.Models;
 using ExamSystem.Repositories.Interfaces;
 using ExamSystem.Services.Interfaces;
@@ -9,18 +9,16 @@ namespace ExamSystem.Services;
 public class QuestionService : IQuestionService
 {
     private readonly IQuestionRepository _questionRepository;
-    private readonly IMapper _mapper;
 
-    public QuestionService(IQuestionRepository questionRepository, IMapper mapper)
+    public QuestionService(IQuestionRepository questionRepository)
     {
         _questionRepository = questionRepository;
-        _mapper = mapper;
     }
 
     public async Task<List<QuestionDto>> GetAsync(int? subjectId)
     {
         var questions = await _questionRepository.GetBySubjectIdAsync(subjectId);
-        return _mapper.Map<List<QuestionDto>>(questions);
+        return questions.Select(QuestionEntityMapper.ToDto).ToList();
     }
 
     public async Task<QuestionDto> CreateAsync(QuestionCreateDto dto)
@@ -84,6 +82,6 @@ public class QuestionService : IQuestionService
         await _questionRepository.AddAsync(question);
         await _questionRepository.SaveChangesAsync();
 
-        return _mapper.Map<QuestionDto>(question);
+        return QuestionEntityMapper.ToDto(question);
     }
 }
