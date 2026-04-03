@@ -22,6 +22,15 @@ public class ExamSession
     public int ViolationCount { get; set; }
     public DateTime? LastSavedAt { get; set; }
 
+    /// <summary>JSON snapshot câu hỏi + thứ tự đáp án đã gửi lúc bắt đầu (để resume sau reload).</summary>
+    public string? SessionResponseSnapshotJson { get; set; }
+
+    /// <summary>Lý do tạm dừng do sự cố (NETWORK_LOSS, PAGE_RELOAD, HEARTBEAT_TIMEOUT, CRASH_OR_UNKNOWN).</summary>
+    public string? SystemPauseReason { get; set; }
+
+    public DateTime? SystemPausedAt { get; set; }
+    public DateTime? LastHeartbeatAt { get; set; }
+
     public Exam Exam { get; set; } = null!;
     public User User { get; set; } = null!;
     public ICollection<SessionAnswer> SessionAnswers { get; set; } = new List<SessionAnswer>();

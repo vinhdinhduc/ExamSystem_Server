@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using Asp.Versioning;
 using ExamSystem.Authorization;
 using ExamSystem.Common;
@@ -8,6 +8,7 @@ using ExamSystem.Models;
 using ExamSystem.Realtime;
 using ExamSystem.Repositories;
 using ExamSystem.Repositories.Interfaces;
+using ExamSystem.Background;
 using ExamSystem.Services;
 using ExamSystem.Services.Interfaces;
 using FluentValidation;
@@ -55,6 +56,7 @@ builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<IExamService, ExamService>();
 builder.Services.AddScoped<IQuestionService, QuestionService>();
 builder.Services.AddScoped<IExamSessionService, ExamSessionService>();
+builder.Services.AddHostedService<ExamSessionHeartbeatWatchdogHostedService>();
 builder.Services.AddScoped<IExamAuthoringService, ExamAuthoringService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IFileService, FileService>();
@@ -102,6 +104,19 @@ builder.Services.AddAuthentication(options =>
 
     options.Events = new JwtBearerEvents
     {
+        // SignalR (trình duyệt): token từ accessTokenFactory được gắn query ?access_token=... chứ không gửi Authorization trên WebSocket.
+        OnMessageReceived = context =>
+        {
+            var path = context.HttpContext.Request.Path;
+            if (!path.StartsWithSegments("/hubs"))
+                return Task.CompletedTask;
+
+            var accessToken = context.Request.Query["access_token"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(accessToken))
+                context.Token = accessToken;
+
+            return Task.CompletedTask;
+        },
         OnAuthenticationFailed = context =>
         {
             if (context.Exception.GetType() == typeof(SecurityTokenExpiredException))
@@ -112,6 +127,10 @@ builder.Services.AddAuthentication(options =>
         },
         OnChallenge = context =>
         {
+            // SignalR negotiate / transport cần 401 + WWW-Authenticate chuẩn; body JSON tùy chỉnh làm client báo "stopped during negotiation".
+            if (context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                return Task.CompletedTask;
+
             context.HandleResponse();
             context.Response.StatusCode = 401;
             context.Response.ContentType = "application/json";
@@ -132,6 +151,9 @@ builder.Services.AddAuthentication(options =>
         },
         OnForbidden = context =>
         {
+            if (context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                return Task.CompletedTask;
+
             context.Response.StatusCode = 403;
             context.Response.ContentType = "application/json";
 

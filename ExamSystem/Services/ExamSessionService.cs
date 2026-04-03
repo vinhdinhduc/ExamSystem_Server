@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using ExamSystem.Data;
 using ExamSystem.DTOs;
 using ExamSystem.Models;
@@ -16,6 +16,8 @@ public class ExamSessionService : IExamSessionService
     private const byte SessionStatusSubmitted = 1;
     private const byte SessionStatusTimedOut = 2;
     private const byte SessionStatusForceSubmitted = 3;
+    private const byte SessionStatusPausedSystem = 4;
+    private const byte SessionStatusDisqualifiedByAdmin = 6;
 
     private readonly ExamSystemDbContext _context;
     private readonly IExamSessionRepository _examSessionRepository;
@@ -85,6 +87,12 @@ public class ExamSessionService : IExamSessionService
             throw new InvalidOperationException("Bạn đã vượt quá số lần làm bài cho phép");
         }
 
+        var existingActive = await _examSessionRepository.GetActiveSessionForUserExamAsync(examId, dto.UserId, now);
+        if (existingActive != null)
+        {
+            return await BuildResumeStartResponseFromSessionAsync(existingActive);
+        }
+
         var orderedQuestions = exam.ExamQuestions
             .OrderBy(q => q.OrderIndex)
             .ToList();
@@ -107,7 +115,8 @@ public class ExamSessionService : IExamSessionService
             QuestionOrder = JsonSerializer.Serialize(orderedQuestions.Select(q => q.QuestionId).ToList()),
             CurrentQuestionIndex = 0,
             ViolationCount = 0,
-            LastSavedAt = now
+            LastSavedAt = now,
+            LastHeartbeatAt = now
         };
 
         var responseQuestions = new List<ExamSessionQuestionDto>();
@@ -142,6 +151,8 @@ public class ExamSessionService : IExamSessionService
                 answerIds));
         }
 
+        session.SessionResponseSnapshotJson = JsonSerializer.Serialize(responseQuestions);
+
         await _examSessionRepository.AddSessionAsync(session);
         await _examSessionRepository.SaveChangesAsync();
 
@@ -151,6 +162,53 @@ public class ExamSessionService : IExamSessionService
             session.ExpiresAt,
             session.AttemptNumber,
             responseQuestions);
+    }
+
+    private Task<StartExamResponseDto> BuildResumeStartResponseFromSessionAsync(ExamSession session)
+    {
+        var questions = DeserializeSnapshotQuestionList(session);
+        return Task.FromResult(new StartExamResponseDto(
+            session.Id,
+            session.StartedAt,
+            session.ExpiresAt,
+            session.AttemptNumber,
+            questions));
+    }
+
+    private static List<ExamSessionQuestionDto> DeserializeSnapshotQuestionList(ExamSession session)
+    {
+        if (!string.IsNullOrWhiteSpace(session.SessionResponseSnapshotJson))
+        {
+            var list = JsonSerializer.Deserialize<List<ExamSessionQuestionDto>>(session.SessionResponseSnapshotJson);
+            if (list is { Count: > 0 })
+            {
+                return list;
+            }
+        }
+
+        return BuildFallbackQuestionListFromOrder(session);
+    }
+
+    private static List<ExamSessionQuestionDto> BuildFallbackQuestionListFromOrder(ExamSession session)
+    {
+        var exam = session.Exam;
+        var orderIds = JsonSerializer.Deserialize<List<Guid>>(session.QuestionOrder ?? "[]") ?? new List<Guid>();
+        var examQMap = exam.ExamQuestions.ToDictionary(x => x.QuestionId, x => x);
+        var list = new List<ExamSessionQuestionDto>();
+
+        foreach (var qid in orderIds)
+        {
+            if (!examQMap.TryGetValue(qid, out var eq))
+            {
+                continue;
+            }
+
+            var question = eq.Question;
+            var answerIds = question.Answers.OrderBy(a => a.OrderIndex).Select(a => a.Id).ToList();
+            list.Add(new ExamSessionQuestionDto(qid, eq.OrderIndex, answerIds));
+        }
+
+        return list;
     }
 
     public async Task AutoSaveAnswerAsync(Guid sessionId, AutoSaveAnswerDto dto)
@@ -194,6 +252,11 @@ public class ExamSessionService : IExamSessionService
         if (session.UserId != dto.UserId)
         {
             throw new UnauthorizedAccessException("Không thể nộp bài cho phiên thi của người dùng khác");
+        }
+
+        if (session.Status == SessionStatusPausedSystem)
+        {
+            throw new InvalidOperationException("Phiên thi đang tạm dừng chờ quản trị viên, không thể tự nộp bài");
         }
 
         if (session.Status != SessionStatusInProgress)
@@ -246,6 +309,7 @@ public class ExamSessionService : IExamSessionService
             throw new UnauthorizedAccessException("Không thể báo vi phạm cho phiên thi của người dùng khác");
         }
 
+        // Chỉ ghi nhận vi phạm khi đang làm bài. Tạm dừng sự cố chờ admin / đã nộp — không tăng ViolationCount (không coi mất mạng như gian lận).
         if (session.Status != SessionStatusInProgress)
         {
             return new ExamViolationResultDto(
@@ -538,6 +602,11 @@ public class ExamSessionService : IExamSessionService
             throw new UnauthorizedAccessException("Không thể chỉnh sửa phiên thi của người dùng khác");
         }
 
+        if (session.Status == SessionStatusPausedSystem)
+        {
+            throw new InvalidOperationException("Phiên thi đang tạm dừng chờ quản trị viên");
+        }
+
         if (session.Status != SessionStatusInProgress)
         {
             throw new InvalidOperationException("Phiên thi đã được nộp");
@@ -610,6 +679,267 @@ public class ExamSessionService : IExamSessionService
         }
 
         return sessions.Count;
+    }
+
+    public async Task<int> PauseSessionsWithStaleHeartbeatAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var threshold = now.AddMinutes(-5);
+
+        var sessions = await _context.ExamSessions
+            .Include(s => s.SessionAnswers)
+                .ThenInclude(sa => sa.SessionAnswerDetails)
+            .Where(s =>
+                s.Status == SessionStatusInProgress &&
+                s.ExpiresAt > now &&
+                s.LastHeartbeatAt != null &&
+                s.LastHeartbeatAt < threshold)
+            .ToListAsync(cancellationToken);
+
+        if (sessions.Count == 0)
+        {
+            return 0;
+        }
+
+        foreach (var session in sessions)
+        {
+            session.Status = SessionStatusPausedSystem;
+            session.SystemPauseReason = "HEARTBEAT_TIMEOUT";
+            session.SystemPausedAt = now;
+            session.LastSavedAt = now;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        foreach (var session in sessions)
+        {
+            await EmitStudentProgressAsync(session, "system_pause");
+            _logger.LogWarning(
+                "Heartbeat watchdog: phiên {SessionId} tạm dừng do không nhận heartbeat sau 5 phút",
+                session.Id);
+        }
+
+        return sessions.Count;
+    }
+
+    public async Task<SystemInterruptionResultDto> ReportSystemInterruptionAsync(SystemInterruptionReportDto dto)
+    {
+        var validTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "NETWORK_LOSS",
+            "PAGE_RELOAD",
+            "HEARTBEAT_TIMEOUT",
+            "CRASH_OR_UNKNOWN"
+        };
+
+        if (!validTypes.Contains(dto.Type))
+        {
+            throw new InvalidOperationException("Loại sự cố không hợp lệ");
+        }
+
+        var session = await _examSessionRepository.GetSessionByIdAsync(dto.SessionId);
+        if (session == null)
+        {
+            throw new KeyNotFoundException($"Không tìm thấy phiên thi với id '{dto.SessionId}'");
+        }
+
+        if (session.UserId != dto.UserId)
+        {
+            throw new UnauthorizedAccessException("Không thể báo sự cố cho phiên thi của người dùng khác");
+        }
+
+        if (session.Status == SessionStatusPausedSystem)
+        {
+            return new SystemInterruptionResultDto(
+                session.Id,
+                session.Status,
+                session.SystemPauseReason,
+                session.SystemPausedAt);
+        }
+
+        if (session.Status != SessionStatusInProgress)
+        {
+            throw new InvalidOperationException("Phiên thi không còn đang làm dở");
+        }
+
+        var now = DateTime.UtcNow;
+        if (dto.CurrentQuestionIndex.HasValue && dto.CurrentQuestionIndex.Value >= 0)
+        {
+            session.CurrentQuestionIndex = dto.CurrentQuestionIndex.Value;
+        }
+
+        session.Status = SessionStatusPausedSystem;
+        session.SystemPauseReason = dto.Type.ToUpperInvariant();
+        session.SystemPausedAt = now;
+        session.LastSavedAt = now;
+
+        await _examSessionRepository.SaveChangesAsync();
+        await EmitStudentProgressAsync(session, "system_pause");
+
+        return new SystemInterruptionResultDto(
+            session.Id,
+            session.Status,
+            session.SystemPauseReason,
+            session.SystemPausedAt);
+    }
+
+    public async Task HeartbeatAsync(ExamSessionHeartbeatDto dto)
+    {
+        var session = await _examSessionRepository.GetSessionByIdAsync(dto.SessionId);
+        if (session == null)
+        {
+            throw new KeyNotFoundException($"Không tìm thấy phiên thi với id '{dto.SessionId}'");
+        }
+
+        if (session.UserId != dto.UserId)
+        {
+            throw new UnauthorizedAccessException("Không thể gửi heartbeat cho phiên thi của người dùng khác");
+        }
+
+        if (session.Status != SessionStatusInProgress)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        session.LastHeartbeatAt = now;
+        await _examSessionRepository.SaveChangesAsync();
+    }
+
+    public async Task<SessionRuntimeStatusDto> GetSessionRuntimeStatusAsync(Guid sessionId, Guid userId)
+    {
+        var session = await _examSessionRepository.GetSessionByIdAsync(sessionId);
+        if (session == null)
+        {
+            throw new KeyNotFoundException($"Không tìm thấy phiên thi với id '{sessionId}'");
+        }
+
+        if (session.UserId != userId)
+        {
+            throw new UnauthorizedAccessException("Không thể xem trạng thái phiên thi của người dùng khác");
+        }
+
+        return new SessionRuntimeStatusDto(
+            session.Id,
+            session.Status,
+            session.SystemPauseReason,
+            session.SystemPausedAt,
+            session.ExpiresAt,
+            session.CurrentQuestionIndex,
+            session.ViolationCount);
+    }
+
+    public async Task<List<PendingSystemPauseItemDto>> GetPendingSystemPausesAsync(Guid viewerUserId, bool viewerIsAdmin)
+    {
+        var query = _context.ExamSessions
+            .AsNoTracking()
+            .Include(s => s.Exam)
+            .Include(s => s.User)
+            .Where(s => s.Status == SessionStatusPausedSystem);
+
+        if (!viewerIsAdmin)
+        {
+            query = query.Where(s => s.Exam.CreatedByUserId == viewerUserId);
+        }
+
+        return await query
+            .OrderByDescending(s => s.SystemPausedAt ?? s.StartedAt)
+            .Select(s => new PendingSystemPauseItemDto(
+                s.Id,
+                s.ExamId,
+                s.Exam.Title,
+                s.UserId,
+                s.User.FullName,
+                s.User.Email,
+                s.SystemPauseReason,
+                s.SystemPausedAt,
+                s.ExpiresAt,
+                s.CurrentQuestionIndex,
+                s.ViolationCount))
+            .ToListAsync();
+    }
+
+    public async Task<AdminResolvePauseResultDto> AdminResolveSystemPauseAsync(
+        Guid sessionId,
+        AdminResolveSessionPauseRequestDto dto,
+        Guid resolverUserId,
+        bool resolverIsAdmin)
+    {
+        var session = await _examSessionRepository.GetSessionByIdAsync(sessionId);
+        if (session == null)
+        {
+            throw new KeyNotFoundException($"Không tìm thấy phiên thi với id '{sessionId}'");
+        }
+
+        if (session.Status != SessionStatusPausedSystem)
+        {
+            throw new InvalidOperationException("Phiên thi không ở trạng thái chờ xử lý sự cố");
+        }
+
+        if (!resolverIsAdmin && session.Exam.CreatedByUserId != resolverUserId)
+        {
+            throw new UnauthorizedAccessException("Bạn không có quyền xử lý phiên thi này");
+        }
+
+        var decision = (dto.Decision ?? "").Trim().ToUpperInvariant();
+        switch (decision)
+        {
+            case "RESUME":
+                var nowResume = DateTime.UtcNow;
+                // Bù thời gian làm bài: trong lúc tạm dừng hệ thống, đồng hồ thật vẫn trôi nếu không gia hạn ExpiresAt → client nhận 0s, kẹt 00:00.
+                var pauseBegan = session.SystemPausedAt ?? nowResume;
+                var pausedFor = nowResume - pauseBegan;
+                if (pausedFor > TimeSpan.Zero)
+                {
+                    session.ExpiresAt = session.ExpiresAt.Add(pausedFor);
+                }
+
+                session.Status = SessionStatusInProgress;
+                session.SystemPauseReason = null;
+                session.SystemPausedAt = null;
+                session.LastHeartbeatAt = nowResume;
+                await _examSessionRepository.SaveChangesAsync();
+                await EmitStudentProgressAsync(session, "admin_resumed");
+                return new AdminResolvePauseResultDto(session.Id, session.Status, null);
+
+            case "SUBMIT":
+                await GradeAndSubmitAsync(session, timedOut: false, forced: false);
+                return new AdminResolvePauseResultDto(session.Id, session.Status, session.SubmittedAt);
+
+            case "DISQUALIFY":
+                await GradeAndSubmitDisqualifiedByAdminAsync(session);
+                return new AdminResolvePauseResultDto(session.Id, session.Status, session.SubmittedAt);
+
+            default:
+                throw new InvalidOperationException("Quyết định không hợp lệ (RESUME, SUBMIT, DISQUALIFY)");
+        }
+    }
+
+    private async Task GradeAndSubmitDisqualifiedByAdminAsync(ExamSession session)
+    {
+        foreach (var sessionAnswer in session.SessionAnswers)
+        {
+            var correctIds = DeserializeIds(sessionAnswer.CorrectAnswerIds);
+            var selectedIds = sessionAnswer.SessionAnswerDetails
+                .Select(d => d.AnswerId)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+
+            var isCorrect = correctIds.SequenceEqual(selectedIds);
+            sessionAnswer.IsCorrect = isCorrect;
+            sessionAnswer.Score = 0;
+            sessionAnswer.AnsweredAt ??= DateTime.UtcNow;
+        }
+
+        session.SubmittedAt = DateTime.UtcNow;
+        session.TotalCorrect = 0;
+        session.Score = 0;
+        session.IsPassed = false;
+        session.Status = SessionStatusDisqualifiedByAdmin;
+
+        await _examSessionRepository.SaveChangesAsync();
+        await EmitStudentSubmitAsync(session, "admin_disqualified");
     }
 
     private async Task GradeAndSubmitAsync(ExamSession session, bool timedOut, bool forced)
@@ -734,6 +1064,11 @@ public class ExamSessionService : IExamSessionService
         if (latestSubmittedSession != null)
         {
             return "DA_LAM";
+        }
+
+        if (latestAnySession is { Status: SessionStatusPausedSystem } && DateTime.UtcNow <= latestAnySession.ExpiresAt)
+        {
+            return "CHO_XU_LY_SU_CO";
         }
 
         if (latestAnySession is { Status: SessionStatusInProgress } && DateTime.UtcNow <= latestAnySession.ExpiresAt)

@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using ExamSystem.Authorization;
 using ExamSystem.Common;
 using ExamSystem.DTOs;
@@ -132,6 +132,36 @@ public class ExamSessionsController : ControllerBase
         return Ok(ApiResponse<List<TeacherAssignedExamResultDto>>.Success(
             results,
             "Lấy danh sách kết quả học sinh theo đề thi thành công"
+        ));
+    }
+
+    [HttpGet("pending-system-pauses")]
+    [RequirePermission(Permissions.ExamSessionView)]
+    public async Task<IActionResult> GetPendingSystemPauses()
+    {
+        var userId = ResolveUserId(null);
+        var isAdmin = User.IsInRole("Admin");
+        var list = await _examSessionService.GetPendingSystemPausesAsync(userId, isAdmin);
+
+        return Ok(ApiResponse<List<PendingSystemPauseItemDto>>.Success(
+            list,
+            "Lấy danh sách phiên chờ xử lý sự cố thành công"
+        ));
+    }
+
+    [HttpPost("{sessionId:guid}/resolve-system-pause")]
+    [RequirePermission(Permissions.ExamSessionGrade)]
+    public async Task<IActionResult> ResolveSystemPause(
+        Guid sessionId,
+        [FromBody] AdminResolveSessionPauseRequestDto dto)
+    {
+        var userId = ResolveUserId(null);
+        var isAdmin = User.IsInRole("Admin");
+        var result = await _examSessionService.AdminResolveSystemPauseAsync(sessionId, dto, userId, isAdmin);
+
+        return Ok(ApiResponse<AdminResolvePauseResultDto>.Success(
+            result,
+            "Đã xử lý phiên thi"
         ));
     }
 

@@ -152,3 +152,50 @@ public record TeacherAssignedExamResultDto(
     int TotalSubmitted,
     int TotalNotSubmitted,
     List<TeacherAssignedStudentResultDto> Students);
+
+/// <summary>Báo sự cố kỹ thuật (không phải vi phạm gian lận).</summary>
+public record SystemInterruptionReportDto(
+    Guid SessionId,
+    Guid UserId,
+    string Type,
+    int? CurrentQuestionIndex);
+
+public record SystemInterruptionResultDto(
+    Guid SessionId,
+    byte Status,
+    string? SystemPauseReason,
+    DateTime? SystemPausedAt);
+
+public record ExamSessionHeartbeatDto(
+    Guid SessionId,
+    Guid UserId);
+
+public record SessionRuntimeStatusDto(
+    Guid SessionId,
+    byte Status,
+    string? SystemPauseReason,
+    DateTime? SystemPausedAt,
+    DateTime ExpiresAt,
+    int CurrentQuestionIndex,
+    int ViolationCount);
+
+public record PendingSystemPauseItemDto(
+    Guid SessionId,
+    Guid ExamId,
+    string ExamTitle,
+    Guid UserId,
+    string StudentFullName,
+    string? StudentEmail,
+    string? SystemPauseReason,
+    DateTime? SystemPausedAt,
+    DateTime ExpiresAt,
+    int CurrentQuestionIndex,
+    int ViolationCount);
+
+public record AdminResolveSessionPauseRequestDto(
+    string Decision);
+
+public record AdminResolvePauseResultDto(
+    Guid SessionId,
+    byte Status,
+    DateTime? SubmittedAt);

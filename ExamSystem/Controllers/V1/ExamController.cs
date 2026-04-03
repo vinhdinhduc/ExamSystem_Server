@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using ExamSystem.Common;
 using ExamSystem.DTOs;
 using ExamSystem.Services.Interfaces;
@@ -66,6 +66,35 @@ public class ExamController : ControllerBase
                 ? "Đã ghi nhận vi phạm. Phiên thi bị tự động nộp do vượt ngưỡng vi phạm"
                 : "Đã ghi nhận vi phạm"
         ));
+    }
+
+    [HttpPost("system-interruption")]
+    public async Task<IActionResult> ReportSystemInterruption([FromBody] SystemInterruptionReportDto dto)
+    {
+        var userId = ResolveUserId(dto.UserId);
+        var result = await _examSessionService.ReportSystemInterruptionAsync(dto with { UserId = userId });
+
+        return Ok(ApiResponse<SystemInterruptionResultDto>.Success(
+            result,
+            "Đã ghi nhận sự cố. Phiên thi tạm dừng chờ quản trị viên xử lý"));
+    }
+
+    [HttpPost("heartbeat")]
+    public async Task<IActionResult> Heartbeat([FromBody] ExamSessionHeartbeatDto dto)
+    {
+        var userId = ResolveUserId(dto.UserId);
+        await _examSessionService.HeartbeatAsync(dto with { UserId = userId });
+
+        return Ok(ApiResponse<object>.Success(null, "OK"));
+    }
+
+    [HttpGet("session-runtime/{sessionId:guid}")]
+    public async Task<IActionResult> GetSessionRuntime(Guid sessionId)
+    {
+        var userId = ResolveUserId(null);
+        var result = await _examSessionService.GetSessionRuntimeStatusAsync(sessionId, userId);
+
+        return Ok(ApiResponse<SessionRuntimeStatusDto>.Success(result, "OK"));
     }
 
     private Guid ResolveUserId(Guid? requestUserId)

@@ -142,6 +142,9 @@ public class ExamSystemDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Score).HasPrecision(5, 2);
+            // Lưu JSON dài: dùng nvarchar(max); không dùng HasMaxLength(8000) để tránh lệch model EF (pending migration).
+            entity.Property(e => e.SessionResponseSnapshotJson).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.SystemPauseReason).HasMaxLength(64);
             entity.HasOne(e => e.Exam)
                 .WithMany(e => e.ExamSessions)
                 .HasForeignKey(e => e.ExamId)
